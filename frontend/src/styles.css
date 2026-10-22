@@ -59,3 +59,16 @@
 }
 
 .hours-note{display:block;margin-top:10px;color:#71827d;font-size:11px;line-height:1.55}
+
+
+/* Demo patient selector: clear, touch-friendly and responsive. */
+.patient-switcher{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:19px;border-color:#cfe0d8;background:linear-gradient(115deg,#fff 0%,#f4faf7 100%)}
+.patient-switcher-copy{display:grid;gap:5px;min-width:0}
+.patient-switcher-copy small{font-size:11px;letter-spacing:1.4px;font-weight:800;color:var(--teal)}
+.patient-switcher-copy strong{font-size:17px;line-height:1.3;color:#172b35}
+.patient-switcher-copy span{max-width:540px;font-size:13px;line-height:1.5;color:#657773}
+.patient-switcher-control{display:grid;gap:7px;width:min(100%,310px);flex-shrink:0}
+.patient-switcher-control label{font-size:13px;font-weight:700;color:#405452}
+.patient-switcher-control select{width:100%;min-height:46px;border:1px solid #cbdcd4;border-radius:9px;background:#fff;color:#172b35;padding:0 12px;font-size:14px}
+.patient-switcher-control select:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #80b9a7;outline-offset:2px}
+@media(max-width:700px){.patient-switcher{align-items:stretch;flex-direction:column;gap:15px}.patient-switcher-control{width:100%}.patient-switcher-copy span{font-size:14px}}
