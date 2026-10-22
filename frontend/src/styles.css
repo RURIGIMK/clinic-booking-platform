@@ -1,1 +1,59 @@
 :root{font-family:Inter,"DM Sans",Arial,sans-serif;color:#172b35;background:#f5f7f6;--teal:#176b62;--line:#e1e9e5}*{box-sizing:border-box}body{margin:0;min-width:320px}button,select,textarea{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}.shell{min-height:100vh}.topbar{height:76px;background:#fff;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;padding:0 max(calc((100vw - 1120px)/2),24px)}.brand{display:flex;align-items:center;gap:10px;color:#172b35;text-decoration:none;font-size:19px;font-weight:800}.brand-icon{display:grid;place-items:center;width:40px;height:40px;background:var(--teal);color:white;border-radius:12px}.brand>span:last-child>span{color:var(--teal)}.brand small{display:block;font-size:9px;letter-spacing:1.6px;color:#7d8c88;margin-top:2px}.secure{display:flex;align-items:center;gap:7px;color:#657673;font-size:12px}.secure svg{color:var(--teal)}.secure b{display:grid;place-items:center;margin-left:9px;width:34px;height:34px;border-radius:50%;background:#e3efe9;color:var(--teal);font-size:10px}.page{max-width:1120px;margin:auto;padding:40px 24px 24px}.intro{display:flex;align-items:center;justify-content:space-between;margin-bottom:30px}.intro label,.card-head small{color:var(--teal);font-size:10px;letter-spacing:1.7px;font-weight:800}.intro h1{font-size:52px;letter-spacing:-2.6px;line-height:1.04;margin:14px 0 12px;font-weight:800}.intro h1 em{font-style:normal;color:var(--teal)}.intro p{max-width:480px;font-size:14px;line-height:1.7;color:#6c7c79;margin:0}.intro-mark{width:165px;height:165px;border:1px solid #ccddd5;border-radius:50%;display:grid;place-items:center;color:var(--teal);background:#eaf3ef;margin-right:40px}.layout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(300px,.85fr);gap:19px;align-items:start}.card{background:white;border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 5px 20px #173b3005}.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}.card-head h2{font-size:20px;letter-spacing:-.7px;margin:7px 0 0}.card-head>svg{color:var(--teal);width:39px;height:39px;padding:10px;background:#eaf3ef;border-radius:12px}.booking>label,.date-row label,.slot-title label,.modal label{display:block;font-size:12px;font-weight:700;color:#405452;margin-bottom:9px}.booking>select{width:100%;height:46px;border:1px solid #dce5e1;border-radius:9px;padding:0 12px;background:#fff;color:#172b35;font-size:12px}.doctor-line{display:flex;align-items:center;gap:10px;background:#f7faf8;padding:12px;margin-top:15px;border-radius:10px}.doctor-line>span{display:grid;place-items:center;width:37px;height:37px;background:#e0eee8;border-radius:10px;color:var(--teal)}.doctor-line div{display:grid;gap:4px}.doctor-line strong,.visit-info>strong{font-size:12px}.doctor-line small,.visit-info small{font-size:10px;color:#788783}.doctor-line>b{margin-left:auto;font-size:10px;color:var(--teal);font-weight:600}.date-row{display:flex;align-items:center;justify-content:space-between;margin-top:24px}.date-row label{margin-bottom:5px}.date-row strong{font-size:13px}.date-row>div:last-child{display:flex;gap:6px}.date-row button{width:32px;height:32px;background:#fff;border:1px solid var(--line);border-radius:8px;color:#506562;font-size:22px}.slot-title{display:flex;align-items:center;justify-content:space-between;margin:22px 0 12px}.slot-title label{margin:0}.slot-title span{display:flex;align-items:center;gap:5px;color:#7c8a87;font-size:10px}.slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.slot{padding:11px 2px;border:1px solid #dce6e1;border-radius:8px;background:white;color:#3d5653;font-size:11px;font-weight:700}.slot:hover,.slot.active{border-color:var(--teal);background:#eaf4f0;color:var(--teal)}.empty{min-height:125px;border:1px dashed #dce6e1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#8ba29a}.empty strong{font-size:12px;color:#536663}.empty span{font-size:11px;color:#85928e}.book-footer{border-top:1px solid #edf0ee;margin-top:24px;padding-top:18px;display:flex;justify-content:space-between;align-items:center;gap:10px}.book-footer>span{display:flex;align-items:center;gap:6px;font-size:10px;color:#7b8985}.book-footer>span svg{color:var(--teal)}.primary,.danger{display:flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:9px;padding:12px 14px;background:var(--teal);color:white;font-size:11px;font-weight:700}.side{display:grid;gap:14px}.visits{padding:21px}.visits .card-head{margin-bottom:12px}.visits .card-head h2{font-size:17px}.visit{display:flex;gap:11px;padding:14px 0;border-bottom:1px solid #edf0ee}.date-badge{flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;width:45px;height:49px;background:#edf5f1;border-radius:9px;color:var(--teal)}.date-badge strong{font-size:19px;line-height:1}.date-badge span{font-size:10px;text-transform:uppercase;margin-top:3px}.visit-info{display:flex;flex-direction:column;gap:5px;min-width:0}.actions{display:flex;gap:13px;margin-top:3px}.actions button,.refresh{border:0;background:transparent;color:var(--teal);padding:0;font-size:10px;font-weight:700}.actions .cancel-link{color:#a75a53}.reschedule{align-self:flex-start;border:1px solid #d4e7df;background:#eaf4f0;border-radius:6px;padding:7px 9px;color:var(--teal);font-size:10px;font-weight:700}.visit-empty{border:0;min-height:145px}.refresh{margin-top:16px}.note{display:flex;gap:12px;align-items:flex-start;background:#eaf3ef;border:1px solid #dceae4;border-radius:13px;padding:16px;color:var(--teal)}.note>svg{flex-shrink:0;width:32px;height:32px;padding:7px;background:#d4e8df;border-radius:9px}.note strong{font-size:12px;color:#172b35}.note p{font-size:11px;line-height:1.6;color:#607773;margin:5px 0 0}.hours{padding:17px 19px}.hours>strong{display:flex;align-items:center;gap:8px;font-size:12px}.hours>strong svg{color:var(--teal)}.hours p{display:flex;justify-content:space-between;gap:10px;padding-top:11px;margin:11px 0 0;border-top:1px solid #edf0ee;font-size:10px}.hours p span{color:#788784}.hours p b{font-size:10px}footer{display:flex;justify-content:space-between;gap:14px;margin-top:27px;padding-top:16px;border-top:1px solid var(--line);color:#85918d;font-size:10px}footer strong{font-size:9px;letter-spacing:1.2px}.alert{display:flex;align-items:center;gap:9px;padding:12px 14px;border-radius:9px;margin-bottom:14px;font-size:12px}.alert span{flex:1}.alert button{border:0;background:transparent;color:inherit;font-weight:700;font-size:11px}.error{background:#fff0ef;border:1px solid #f3d0cc;color:#9f2d25}.success{background:#e9f6ef;border:1px solid #d0e9db;color:#226e4a}.overlay{position:fixed;inset:0;background:#142b2b80;display:grid;place-items:center;padding:20px;z-index:4}.modal{width:100%;max-width:420px;background:white;border-radius:16px;padding:25px;box-shadow:0 25px 80px #12252230}.modal-x{display:grid;place-items:center;width:39px;height:39px;border-radius:11px;background:#fff0ef;color:#b42318}.modal h2{font-size:20px;margin:17px 0 8px}.modal p{font-size:12px;line-height:1.6;color:#71807d;margin:0 0 20px}.modal textarea{width:100%;min-height:78px;border:1px solid #dce5e1;border-radius:8px;padding:10px;font-size:12px;resize:vertical}.modal>div:last-child{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.modal>div:last-child>button:first-child{border:0;background:#eef2f0;color:#465957;border-radius:8px;padding:11px;font-size:11px;font-weight:700}.danger{background:#b42318}.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:800px){.layout{grid-template-columns:1fr}.intro-mark{margin-right:8px}.side{grid-template-columns:1fr 1fr}.visits{grid-column:1/-1}}@media(max-width:560px){.topbar{height:66px;padding:0 16px}.secure{font-size:0}.secure b{font-size:10px}.page{padding:25px 14px 20px}.intro h1{font-size:43px}.intro-mark{display:none}.intro p{font-size:12px}.card{padding:19px 16px}.card-head h2{font-size:17px}.slots{grid-template-columns:repeat(3,minmax(0,1fr))}.book-footer{align-items:stretch;flex-direction:column}.primary{width:100%}.side{grid-template-columns:1fr}.visits{grid-column:auto}footer{flex-direction:column;line-height:1.5}.modal>div:last-child{flex-direction:column-reverse}.modal>div:last-child button{width:100%}}
+
+
+/* Accessibility and rescheduling dialog refinements */
+:root{font-size:16px;line-height:1.5}
+.intro p{font-size:15px}
+.intro label,.card-head small{font-size:11px}
+.booking>label,.date-row label,.slot-title label,.modal label{font-size:13px}
+.booking>select{font-size:14px}
+.doctor-line strong,.visit-info>strong{font-size:13px}
+.doctor-line small,.visit-info small{font-size:12px}
+.doctor-line>b{font-size:11px}
+.date-row strong{font-size:14px}
+.slot-title span{font-size:11px}
+.slot{font-size:12px;padding:12px 4px;min-height:42px}
+.book-footer>span{font-size:11px}
+.primary,.danger{font-size:12px;min-height:42px}
+.card-head h2{font-size:21px}
+.visits .card-head h2{font-size:18px}
+.actions button,.refresh{font-size:12px;min-height:28px}
+.reschedule{font-size:12px}
+.empty strong{font-size:13px}
+.empty span{font-size:12px}
+.note strong{font-size:13px}
+.note p{font-size:12px}
+.hours>strong{font-size:13px}
+.hours p,.hours p b{font-size:11px}
+.alert{font-size:13px;line-height:1.5}
+.alert button{font-size:12px}
+.modal h2{font-size:22px}
+.modal p{font-size:14px;line-height:1.65}
+.modal textarea{font-size:14px}
+.modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
+.modal-actions>button:first-child{border:0;background:#eef2f0;color:#465957;border-radius:8px;padding:11px 13px;font-size:12px;font-weight:700;min-height:42px}
+.modal-actions .primary,.modal-actions .danger{min-height:42px}
+.reschedule-modal{position:relative;max-height:min(88vh,760px);overflow-y:auto}
+.modal-close{position:absolute;right:18px;top:18px;display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--line);border-radius:9px;background:white;color:#506562}
+.modal-eyebrow{display:block;color:var(--teal);font-size:11px;font-weight:800;letter-spacing:1.4px;padding-right:40px}
+.reschedule-modal h2{margin-top:12px;padding-right:28px}
+.reschedule-date-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 13px;padding:12px;background:#f7faf8;border-radius:10px}
+.reschedule-date-row strong{font-size:14px}
+.reschedule-date-row>div{display:flex;gap:6px}
+.reschedule-date-row button{width:36px;height:36px;border:1px solid var(--line);border-radius:8px;background:white;color:#405452;font-size:23px;line-height:1}
+.reschedule-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.modal-state{min-height:132px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:20px 12px;text-align:center;border:1px dashed #dce6e1;border-radius:10px;color:#82938d}
+.modal-state strong{font-size:13px;color:#536663}
+.modal-state span{font-size:12px;line-height:1.5}
+.modal-error{display:flex;align-items:center;gap:12px;padding:12px;border-radius:9px;background:#fff0ef;border:1px solid #f3d0cc;color:#9f2d25;font-size:13px}
+.modal-error span{flex:1}
+.modal-error button{border:0;background:transparent;color:inherit;font-weight:700}
+@media(max-width:560px){
+  .intro p{font-size:14px}
+  .card-head h2{font-size:19px}
+  .visits .card-head h2{font-size:18px}
+  .modal-actions{flex-direction:column-reverse}
+  .modal-actions>button{width:100%}
+  .reschedule-slots{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .reschedule-date-row strong{font-size:13px}
+}
