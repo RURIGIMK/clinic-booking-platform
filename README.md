@@ -1,157 +1,366 @@
 # Clinic Booking Platform
 
-A full-stack clinic appointment booking application developed for the Implementation Engineer take-home assessment. The project demonstrates appointment scheduling, doctor availability, booking validation, cancellation and rescheduling, automated testing, and cloud deployment.
+A full-stack clinic appointment booking system developed for the Implementation Engineer Take-Home Assessment. The application allows patients to view doctors, check appointment availability, book appointments, review upcoming bookings, cancel appointments, and reschedule existing bookings.
 
-**Live application:** https://clinic-booking-platform.rurigimk.workers.dev  
-**Source code:** https://github.com/RURIGIMK/clinic-booking-platform
+**Live application:** [https://clinic-booking-platform.rurigimk.workers.dev](https://clinic-booking-platform.rurigimk.workers.dev)
 
-## 1. Project Overview
+**GitHub repository:** [https://github.com/RURIGIMK/clinic-booking-platform](https://github.com/RURIGIMK/clinic-booking-platform)
 
-The platform allows a demo patient to view doctors, check available appointment slots, book an appointment, review upcoming appointments, and cancel or reschedule an existing booking.
+**Technology stack:** Python, FastAPI, SQLAlchemy, PostgreSQL, React, TypeScript, AWS Lambda, Amazon API Gateway, Cloudflare Workers, and GitHub Actions.
 
-The application uses synthetic patient and doctor data. It is a demonstration system, not a production clinical application.
+---
 
-### Key Features
+# Section 1: System Design
 
-- Doctor directory with specialty information.
-- Doctor availability based on configured working hours.
-- Thirty-minute appointment slots.
-- Lunch-break and working-hour validation.
-- One-hour minimum advance notice for booking and rescheduling. A slot exactly one hour ahead is permitted.
-- Appointment creation, cancellation, and rescheduling.
-- Conflict detection for overlapping appointments.
-- Timezone-aware appointment handling.
-- Request identifiers and structured request logging.
-- API health and readiness endpoints.
-- Automated backend checks and frontend production builds.
-- Deployment to Cloudflare Workers through GitHub Actions.
+## 1.1 Problem Statement
 
-## 2. Technology Stack
+The clinic has five doctors, each with defined working hours. Patients need to view available appointment slots for a selected doctor and date, book a suitable slot, and manage existing appointments.
 
-| Layer | Technology | Purpose |
-|---|---|---|
-| Frontend | React, TypeScript, Vite | User interface and frontend build |
-| API | Python, FastAPI | HTTP endpoints and request validation |
-| ORM | SQLAlchemy | Database access and relational models |
-| Database | Neon PostgreSQL | Hosted relational data storage |
-| Local database | SQLite | Local development and testing |
-| Serverless compute | AWS Lambda, Python 3.12 | Backend execution |
-| API exposure | Amazon API Gateway HTTP API | Public HTTPS API endpoint |
-| Lambda adapter | Mangum | Adapts FastAPI to AWS Lambda |
-| Frontend hosting | Cloudflare Workers | Serves the built single-page application |
-| CI/CD | GitHub Actions | Testing, building, and frontend deployment |
-| Logging | Python logging and CloudWatch Logs | Request diagnostics and backend logs |
+The main design requirement is to prevent two patients from booking the same doctor's appointment slot while keeping the application straightforward to operate and extend as the clinic grows.
 
-## 3. System Architecture
+The design therefore separates the user interface, API, booking logic, data persistence, and deployment infrastructure.
 
-```text
-                    Patient / Browser
-                           |
-                           v
-              Cloudflare Workers
-              React + TypeScript UI
-                           |
-                           | HTTPS API requests
-                           v
-              Amazon API Gateway
-                    HTTP API
-                           |
-                           v
-                 AWS Lambda Function
-                    Python 3.12
-                           |
-                           v
-                 FastAPI + SQLAlchemy
-                           |
-                           | TLS database connection
-                           v
-                    Neon PostgreSQL
+## 1.2 System Architecture
 
-     GitHub Repository
-             |
-             v
-       GitHub Actions
-       /      |       \\
- Backend   Frontend   Deploy frontend
- checks     build     to Cloudflare
+The application uses a client-server architecture with a separately deployed frontend and backend API.
+```
+                  Patient
+                     |
+                     v
+             React + TypeScript
+             Cloudflare Workers
+                     |
+                HTTPS requests
+                     |
+                     v
+             Amazon API Gateway
+                     |
+                     v
+               AWS Lambda
+               Python 3.12
+                     |
+                     v
+              FastAPI Application
+                     |
+             Booking and Validation
+                     |
+                     v
+             SQLAlchemy ORM
+                     |
+                     v
+             Neon PostgreSQL
 ```
 
-The frontend and API are deployed separately. The frontend uses `VITE_API_BASE_URL` to determine which API origin receives requests. The API uses `DATABASE_URL` to connect to the database.
+The development and deployment workflow is separate from the runtime request flow.
+```
+             GitHub Repository
+                     |
+                     v
+              GitHub Actions
+                     |
+            +--------+--------+
+            |                 |
+            v                 v
+      Backend checks     Frontend build
+            |                 |
+            +--------+--------+
+                     |
+           Both checks succeed
+                     |
+              Push to main
+                     |
+                     v
+          Cloudflare deployment
+```
 
-The production API base URL configured in the current workflow is:
+The backend and frontend are independently deployable. This allows the user interface to be updated without requiring the API to be hosted on the same server.
 
-`https://yfk5o3gvki.execute-api.eu-west-2.amazonaws.com`
+## 1.3 Data Models
 
-The Cloudflare Worker serves the built frontend assets. API requests are sent to API Gateway rather than handled by the frontend Worker.
+The system uses four principal relational models.
 
-## 4. API Reference
+### Doctor
 
-The API exposes the following endpoints.
+Represents a doctor who provides appointments.
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/health` | Basic liveness check |
-| GET | `/ready` | Checks database connectivity |
-| GET | `/doctors` | Lists active doctors |
-| GET | `/doctors/{doctor_id}/availability?date=YYYY-MM-DD` | Returns available slots for a date |
-| POST | `/appointments` | Creates an appointment |
-| GET | `/patients/{patient_id}/appointments` | Lists upcoming booked appointments |
-| PATCH | `/appointments/{appointment_id}/cancel` | Cancels an appointment |
-| PATCH | `/appointments/{appointment_id}/reschedule` | Reschedules an appointment |
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary key |
+| `name` | Doctor's name |
+| `specialty` | Medical specialty |
+| `active` | Indicates whether the doctor is available for new bookings |
+| `working_hours` | Relationship to the doctor's configured working sessions |
 
-Interactive API documentation is available from FastAPI at `/docs` when running the API locally.
+Separating doctor information from working hours allows a doctor's schedule to be changed without duplicating the doctor's details.
 
-### Error handling
+### DoctorWorkingHour
 
-The API uses HTTP status codes to distinguish common outcomes:
+Represents a doctor's working session for a particular weekday.
 
-- `201`: appointment created successfully.
-- `404`: requested doctor, patient, or appointment does not exist.
-- `409`: booking conflict or incompatible appointment state.
-- `422`: invalid request data or unavailable appointment time.
-- `503`: handled database operation failure or readiness failure.
-- `500`: unexpected server error.
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary key |
+| `doctor_id` | Reference to the doctor |
+| `weekday` | Day of the week, Monday to Sunday |
+| `opens_at` | Start of the working session |
+| `closes_at` | End of the working session |
+| `break_starts_at` | Optional start of a break |
+| `break_ends_at` | Optional end of a break |
 
-Responses may include an `X-Request-ID` header to help trace requests in logs.
+A uniqueness constraint on `doctor_id` and `weekday` prevents multiple schedule records for the same doctor and weekday under the current one-session-per-day model.
 
-## 5. Scheduling and Data Integrity
+### Patient
 
-### Scheduling assumptions
+Represents a patient in the demonstration system.
 
-The seed data defines five synthetic doctors:
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary key |
+| `full_name` | Patient's name |
 
-| Specialty | Routine schedule |
-|---|---|
+The current application uses synthetic patient records and a demonstration patient selector. This is not an authentication or identity-verification mechanism.
+
+### Appointment
+
+Represents a patient's booking with a doctor.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary key |
+| `doctor_id` | Reference to the doctor |
+| `patient_id` | Reference to the patient |
+| `starts_at` | Appointment start timestamp |
+| `ends_at` | Appointment end timestamp |
+| `status` | Current appointment status |
+| `cancellation_reason` | Optional reason for cancellation |
+| `created_at` | Timestamp when the appointment was created |
+
+Appointments use a status to distinguish active bookings from cancelled ones. A cancelled appointment remains in the database rather than being deleted, preserving its basic booking history.
+
+A database-level partial unique index prevents multiple active appointments from using the same doctor's start time. Application validation complements this constraint by checking the complete booking rules.
+
+## 1.4 Key Booking Rules
+
+The API validates a booking against the following conditions:
+
+1. The doctor exists and is active.
+2. The patient exists.
+3. The appointment starts at least one hour after the current UTC time. Exactly one hour ahead is permitted.
+4. The requested time aligns with a 30-minute slot.
+5. The appointment falls within the doctor's configured working hours.
+6. The appointment does not overlap a configured break.
+7. The slot does not conflict with another active booking for the same doctor.
+
+The application checks availability before creating a booking. However, an availability check alone is insufficient because two concurrent requests could attempt to book the same slot. The database uniqueness constraint provides an additional safeguard against duplicate active bookings.
+
+### Cancellation
+
+A cancellation changes the appointment status and records the supplied reason. The appointment is not deleted. Since availability is calculated from active bookings, a cancelled slot can become available again.
+
+An attempt to cancel an already cancelled appointment returns an error rather than silently repeating the operation.
+
+### Rescheduling
+
+Rescheduling validates the requested destination using the same core rules as a new booking, including the one-hour minimum advance notice. If the destination is unavailable or invalid, the request is rejected.
+
+A cancelled appointment cannot be rescheduled. For a successful reschedule, the original slot becomes available again and the appointment moves to the new time.
+
+## 1.5 Components and Responsibilities
+
+| Component | Responsibility |
+| --- | --- |
+| React and TypeScript frontend | Doctor selection, availability display, booking forms, and appointment management |
+| FastAPI | REST endpoints, request validation, response formatting, and HTTP error handling |
+| Booking logic | Slot generation, working-hour validation, cancellation, rescheduling, and conflict checks |
+| SQLAlchemy | Relational persistence and database queries |
+| Neon PostgreSQL | Hosted persistent application data |
+| AWS Lambda | Serverless backend execution |
+| Amazon API Gateway | Public HTTPS access to the backend |
+| Cloudflare Workers | Frontend delivery |
+| GitHub Actions | Automated checks, frontend build, and deployment |
+
+## 1.6 Design Decisions and Trade-offs
+
+**FastAPI rather than a larger web framework:** FastAPI provides request validation, typed endpoint definitions, and generated API documentation while keeping the backend relatively lightweight.
+
+**SQLAlchemy:** The ORM separates database access from the HTTP layer and supports SQLite for local development and PostgreSQL for the hosted environment. The two databases still require testing for differences in concurrency and database-specific behaviour.
+
+**PostgreSQL:** A relational database is appropriate because doctors, patients, schedules, and appointments have clear relationships and integrity requirements.
+
+**Database-level uniqueness:** Application-level checks provide meaningful validation errors, while the database constraint protects against duplicate active bookings during concurrent requests. A database constraint does not replace all application validation, but it provides an important additional guarantee.
+
+**Serverless backend:** AWS Lambda and API Gateway avoid maintaining a dedicated application server. The trade-offs include deployment packaging, cold starts, execution limits, and database connection management.
+
+**Separate frontend hosting:** Cloudflare Workers serves the built frontend independently of the backend API. This simplifies frontend delivery but requires correct API URL and cross-origin configuration.
+
+**Synthetic demonstration data:** Synthetic data makes the application reproducible without exposing real patient information. It is appropriate for the assessment but does not establish production readiness.
+
+## 1.7 Assumptions and Ambiguities
+
+The assessment leaves some operational details open. The following assumptions were adopted:
+
+- Appointment durations are fixed at 30 minutes.
+- A doctor's working schedule is configured by weekday.
+- The seeded schedules are illustrative rather than actual operating hours for a real clinic.
+- The clinic timezone defaults to `Africa/Nairobi`.
+- Appointment timestamps supplied to the API must include a timezone offset.
+- Appointment timestamps are persisted in UTC and interpreted in the clinic's local timezone for schedule validation.
+- A slot is considered unavailable when it conflicts with an active booking.
+- Cancellation preserves the appointment record and changes its status.
+- Rescheduling is allowed only for appointments that have not been cancelled.
+- The current patient selector is for demonstration purposes and does not prove patient identity.
+
+The implementation rejects appointments that start less than one hour after the current UTC time. Exactly one hour ahead is permitted. The availability calculation excludes slots inside that window, and rescheduling applies the same validation as a new booking.
+
+## 1.8 Seeded Doctor Schedules
+
+The seed data contains five synthetic doctors.
+
+| Specialty | Working schedule |
+| --- | --- |
 | General Practice | Monday to Friday, 08:00 to 17:00; Saturday, 09:00 to 13:00 |
 | Paediatrics | Monday to Friday, 08:00 to 17:00; Saturday, 09:00 to 13:00 |
 | Family Medicine | Monday to Friday, 08:00 to 17:00; Saturday, 09:00 to 13:00 |
 | Dermatology | Monday, Tuesday, Thursday, and Friday, 09:00 to 16:00 |
 | Cardiology | Monday, Wednesday, and Friday, 09:00 to 16:00 |
 
-The weekday schedules include a 12:00 to 13:00 lunch break. The Saturday schedules for General Practice, Paediatrics, and Family Medicine do not include a lunch break. No routine Sunday sessions are seeded.
+The weekday schedules include a lunch break from 12:00 to 13:00. The Saturday schedules do not include a lunch break. No routine Sunday sessions are seeded.
 
-These are illustrative application settings, not a statement of standard operating hours for real clinics.
+These schedules are configurable demonstration data, not fixed business rules for all clinics.
 
-### Booking validation
+---
 
-The backend validates that an appointment:
+# Section 2: API Implementation
 
-1. Is at least one hour ahead of the current UTC time. A slot exactly one hour ahead is permitted.
-2. Belongs to an active doctor and an existing demo patient.
-3. Fits the doctor's configured working hours.
-4. Does not overlap a lunch break.
-5. Aligns with the thirty-minute slot grid.
-6. Does not overlap another active booking for the same doctor.
+## 2.1 Technology
 
-A database-level uniqueness guard provides additional protection against duplicate active bookings for the same doctor and start time. This matters because two concurrent requests can pass an application-level availability check before either request commits.
+The backend is implemented in Python using FastAPI and SQLAlchemy. It exposes REST endpoints for doctor availability and appointment management.
 
-Rescheduling validates the requested destination before updating the existing appointment. Cancelled appointments cannot be rescheduled.
+The API is designed to keep HTTP request handling separate from the booking logic and database models.
 
-### Timezone handling
+## 2.2 API Endpoints
 
-The configured clinic timezone defaults to `Africa/Nairobi`. Incoming appointment timestamps must include a timezone offset. The application converts appointment times to UTC for persistence and uses the clinic timezone when evaluating local working hours.
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/health` | Checks whether the API process responds |
+| `GET` | `/ready` | Checks database connectivity |
+| `GET` | `/doctors` | Lists active doctors |
+| `GET` | `/doctors/{doctor_id}/availability?date=YYYY-MM-DD` | Returns available 30-minute slots |
+| `POST` | `/appointments` | Books an appointment |
+| `GET` | `/patients/{patient_id}/appointments` | Lists upcoming booked appointments |
+| `PATCH` | `/appointments/{appointment_id}/cancel` | Cancels an appointment with a reason |
+| `PATCH` | `/appointments/{appointment_id}/reschedule` | Reschedules an appointment |
 
-## 6. Run Locally
+Interactive API documentation is available at `/docs` when running the backend locally.
+
+## 2.3 Validation and Error Handling
+
+The API distinguishes invalid input, missing resources, and booking conflicts through HTTP status codes.
+
+| Status | Meaning |
+| --- | --- |
+| `200 OK` | Request completed successfully |
+| `201 Created` | Appointment created |
+| `404 Not Found` | Requested doctor, patient, or appointment does not exist |
+| `409 Conflict` | Booking conflict or incompatible appointment state |
+| `422 Unprocessable Entity` | Request validation failure or invalid appointment time |
+| `503 Service Unavailable` | Database readiness or handled database operation failure |
+| `500 Internal Server Error` | Unexpected server-side error |
+
+The precise response depends on the failure and the endpoint's validation path. FastAPI's request validation also provides structured error details for malformed input.
+
+The backend adds an `X-Request-ID` response header and logs request details, including method, path, status, and duration. This helps correlate a request with backend logs during troubleshooting.
+
+## 2.4 Availability Calculation
+
+Availability is generated from a doctor's configured working hours for the requested date.
+
+The booking logic considers:
+
+- The weekday's working session.
+- Any configured break.
+- The 30-minute slot interval.
+- Existing active appointments.
+- The current time, excluding slots that start less than one hour after the current UTC time.
+
+The frontend displays the available slots returned by the API. The backend independently validates a booking request rather than trusting that a slot remains available simply because it was displayed earlier.
+
+## 2.5 Basic Test Coverage
+
+The repository includes a pytest test suite for backend behaviour and a frontend production build check in CI.
+
+The backend checks include selected Ruff static checks and pytest execution. The frontend uses `npm ci` and `npm run build`.
+
+The booking tests include rejection of appointments within the one-hour advance-notice window, acceptance of a booking more than one hour ahead, and rejection of a reschedule into the one-hour window.
+
+These checks are useful for catching regressions, but the configured CI checks do not replace a live end-to-end smoke test against the deployed API and database. Concurrent booking behaviour and PostgreSQL-specific behaviour should receive additional testing before production use.
+
+---
+
+# Section 3: Deployment and CI/CD
+
+## 3.1 Public Deployment
+
+**Live application:** [https://clinic-booking-platform.rurigimk.workers.dev](https://clinic-booking-platform.rurigimk.workers.dev)
+
+The frontend is deployed to Cloudflare Workers. The backend is exposed through Amazon API Gateway and executes on AWS Lambda. The hosted relational database is Neon PostgreSQL.
+
+The production API origin configured in GitHub Actions is:
+
+`https://yfk5o3gvki.execute-api.eu-west-2.amazonaws.com`
+
+The frontend and backend are separate deployments. The frontend receives its API origin through the `VITE_API_BASE_URL` build-time variable.
+
+## 3.2 Deployment Architecture
+
+| Service | Role |
+| --- | --- |
+| Cloudflare Workers | Public frontend hosting |
+| Amazon API Gateway HTTP API | HTTPS endpoint for backend requests |
+| AWS Lambda, Python 3.12 | Backend execution |
+| Neon PostgreSQL | Hosted database |
+| GitHub Actions | Automated checks and deployment |
+
+## 3.3 CI/CD Workflow
+
+The workflow is defined in `.github/workflows/ci.yml`.
+
+The pipeline is configured to run on:
+
+- Pull requests targeting `main`.
+- Pushes to `main`.
+- Pushes to branches matching `feature/**`.
+
+The backend job installs the Python project with its development dependencies, runs selected Ruff checks, and executes pytest.
+
+The frontend job installs dependencies using `npm ci` and builds the production frontend using `npm run build`.
+
+For a push to `main`, the deployment job waits for both the backend and frontend jobs to succeed. It then builds the frontend with the configured API URL and deploys it to Cloudflare Workers using Wrangler and `frontend/wrangler.jsonc`.
+
+The deployment job uses the GitHub Actions `production` environment and requires these secrets:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+The values are configured in the repository's GitHub environment settings rather than committed to source control.
+
+### Deployment trigger
+
+**Branch:** `main`
+
+**Trigger:** A push to `main`, including a merge that updates the branch, initiates the workflow. The deployment job runs only after the backend and frontend checks pass.
+
+This means a successful pull request check alone does not deploy the frontend. The deployment is tied to the subsequent push to `main`.
+
+## 3.4 Deployment Troubleshooting
+
+During deployment, Wrangler initially failed to locate the expected entry point. The deployment command was updated to explicitly reference `wrangler.jsonc`.
+
+A later run exposed a separate issue involving missing Cloudflare credentials in the GitHub Actions environment. The required secrets were configured in the `production` environment, and the deployment workflow subsequently completed successfully.
+
+This demonstrated why deployment failures need to be diagnosed from their specific error messages. Correcting the configuration path and providing deployment credentials addressed different problems.
+
+## 3.5 Local Development
 
 ### Prerequisites
 
@@ -160,46 +369,53 @@ The configured clinic timezone defaults to `Africa/Nairobi`. Incoming appointmen
 - Node.js 22
 - npm
 
-SQLite is used by default for local development. PostgreSQL is available for environments that need to match the hosted database more closely.
-
 ### Backend setup
 
-From the repository root, open PowerShell:
-
+From PowerShell, clone the repository and create a virtual environment:
 ```powershell
 git clone https://github.com/RURIGIMK/clinic-booking-platform.git
 cd clinic-booking-platform
 
 py -3.12 -m venv .venv
-.\\.venv\\Scripts\\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+```
 
+Configure the local environment:
+```powershell
 $env:DATABASE_URL = "sqlite:///./clinic_booking.db"
 $env:CORS_ORIGINS = "http://localhost:5173"
 $env:CLINIC_TIMEZONE = "Africa/Nairobi"
+```
 
+Seed the local database:
+```powershell
 python backend/seed.py
+```
+
+Start the API:
+```powershell
 uvicorn app.main:app --app-dir backend --reload
 ```
 
-If PowerShell blocks virtual environment activation, run the following in the same terminal and activate the environment again:
+The backend is normally available at `http://localhost:8000`.
 
+Useful local endpoints:
+
+- Health: `http://localhost:8000/health`
+- Readiness: `http://localhost:8000/ready`
+- API documentation: `http://localhost:8000/docs`
+
+If PowerShell blocks virtual environment activation, run the following command in the same terminal and try activation again:
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
-Check the API at:
-
-- `http://localhost:8000/health`
-- `http://localhost:8000/ready`
-- `http://localhost:8000/docs`
-
 ### Frontend setup
 
 Open a second terminal at the repository root:
-
 ```powershell
 cd frontend
 npm ci
@@ -209,125 +425,139 @@ npm run dev
 
 Open the local URL printed by Vite, normally `http://localhost:5173`.
 
-The frontend needs the correct `VITE_API_BASE_URL` at build time. Do not use a real database connection string as a frontend variable.
+The `VITE_API_BASE_URL` variable is public build configuration. Do not put database credentials, API secrets, or other private values in frontend environment variables.
 
 ### Run the checks
 
 From the repository root, with the Python environment active:
-
 ```powershell
 ruff check backend --select F821,F822,F823,F811
 pytest
 ```
 
 From the `frontend` directory:
-
 ```powershell
 npm ci
 npm run build
 ```
 
-These checks are also executed by GitHub Actions. A successful build does not by itself verify all live application flows.
+The same categories of backend checks and frontend build are configured in GitHub Actions.
 
-## 7. CI/CD and Deployment
+## 3.6 Operational Verification
 
-The GitHub Actions workflow is defined in `.github/workflows/ci.yml`.
+A successful deployment confirms that the deployment job completed. It does not by itself prove that every application feature works against the live API and database.
 
-On pull requests targeting `main` and pushes to `main` or `feature/**`, the workflow runs backend static checks and tests, then builds the frontend.
+A complete manual smoke test should verify:
 
-For a push to `main`, the frontend deployment job runs only after the backend and frontend jobs succeed. It builds the frontend with the configured API origin and deploys the `frontend` directory using Wrangler and `frontend/wrangler.jsonc`.
+1. The live frontend loads.
+2. The doctor directory is retrieved from the API.
+3. Availability can be retrieved for a doctor and date.
+4. A valid appointment can be created.
+5. A second booking for the same slot is rejected.
+6. Cancellation records a reason and releases the slot.
+7. A cancelled appointment cannot be cancelled or rescheduled again.
+8. Rescheduling validates the destination and releases the original slot.
+9. The readiness endpoint reports database connectivity.
 
-The deployment uses the GitHub `production` environment and requires these secrets:
+The live application URL is published above, but these end-to-end checks should only be described as complete after they have actually been run and their results recorded.
 
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
+---
 
-Deployment configuration details are documented in [CONFIGURATION.md](CONFIGURATION.md).
+# Section 4: AI Reflection
 
-### Current deployment status
+## 4.1 What did you use AI for across the four sections?
 
-The last reported GitHub Actions deployment completed successfully and Wrangler reported the Worker URL:
+I used AI as both a generative tool and an engineering assistant throughout the assessment. Its generative use included drafting and refining code, developing candidate implementation approaches, producing technical explanations, and creating documentation. I also used it to investigate errors, review configuration, and reason through testing and deployment.
 
-https://clinic-booking-platform.rurigimk.workers.dev
+- **Section 1, System Design:** I used AI to explore architecture options, organize the relationships between the application components, and develop explanations of the data models, booking rules, and design trade-offs. I reviewed the resulting design against the scenario and the implementation requirements.
+- **Section 2, API Implementation:** I used AI to discuss implementation approaches and generate candidate code or technical solutions where useful. I treated generated output as a starting point that needed to fit the existing codebase, validation rules, and application structure.
+- **Section 3, Deployment and CI/CD:** I used AI to investigate deployment failures, explore configuration issues, and identify possible fixes. I checked the suggestions against the repository, workflow configuration, and deployment logs.
+- **Section 4, Documentation and Reflection:** I used AI generatively to draft and refine the README, architecture explanations, local setup instructions, deployment guidance, engineering trade-offs, and this reflection. I reviewed the documentation against the actual implementation and distinguished verified behaviour from work that remained unverified.
 
-Deployment success confirms that the frontend deployment job completed. End-to-end verification still requires checking that the live UI can load doctors and availability and that booking, cancellation, and rescheduling work correctly against the configured API and database.
+Generative AI was particularly useful for moving from a blank page to a structured draft, exploring alternative approaches quickly, and improving the clarity of technical explanations. Its output still required review, adaptation, and verification before being used in the submission.
 
-## 8. Testing Strategy
+## 4.2 Give one example where an AI suggestion improved your work. What did you prompt it with?
 
-The project includes automated backend tests and a frontend production build check. The backend tests include coverage for rejecting bookings within the one-hour notice window, accepting a valid booking more than one hour ahead, and rejecting a reschedule into that window.
+An example was investigating the Wrangler deployment failure. An early deployment attempt failed because Wrangler could not locate the expected entry point. Reviewing the deployment command alongside the repository configuration identified the configuration path as an area to correct. The deployment command was made explicit about using `wrangler.jsonc`.
 
-The CI workflow currently runs:
+A representative prompt for this investigation would be:
 
-1. Python dependency installation.
-2. Ruff checks for selected undefined-name and redefinition errors.
-3. Pytest against the configured backend test suite.
-4. Frontend dependency installation using `npm ci`.
-5. A TypeScript and Vite production build.
-6. A frontend deployment on eligible pushes to `main`.
+> Review the frontend deployment configuration and GitHub Actions workflow. Identify why Wrangler may not be locating the expected entry point, and suggest the smallest change consistent with the existing project structure.
 
-For a complete release check, the automated workflow should be supplemented by a manual smoke test of the deployed application, including database readiness and the appointment lifecycle.
+This is a representative reconstruction of the prompt, not a claim that it reproduces the original wording verbatim.
 
-## 9. Security and Scope
+The suggestion helped narrow the investigation to the relationship between the deployment command and the configuration file. A subsequent run exposed a separate missing-credentials issue. After the required Cloudflare secrets were configured in the GitHub `production` environment, the deployment workflow completed successfully.
 
-This is a synthetic-data demonstration. The current patient selector is a demo convenience, not an authentication mechanism.
+The improvement came from using AI to narrow the investigation and then checking the proposed direction against the actual repository and workflow evidence. The two deployment errors had different causes, so resolving one did not automatically resolve the other.
 
-The project does not provide a complete production security model, including verified patient identity, authorization policies, role-based access control, multi-factor authentication, a comprehensive audit trail, clinical record handling, appointment reminders, payment processing, disaster recovery, or production-grade monitoring.
+## 4.3 Give one example where AI output was wrong or incomplete and how you caught it.
 
-Before using an appointment platform for real patients, the deployment would need a security and privacy review, appropriate authentication and authorization, secret management, operational monitoring, backup and recovery procedures, and verification of the applicable legal and regulatory requirements.
+During deployment troubleshooting, an AI-generated explanation suggested that the existing Cloudflare deployment settings were misconfigured.
 
-Never commit database credentials or deployment tokens to the repository. Do not put private credentials in `VITE_` variables because frontend variables are included in the browser build.
+Rather than changing the settings immediately, I compared the explanation with the repository and workflow. The configuration already specified the `main` branch, the `frontend` directory, the Wrangler deployment command, and the API URL. The available evidence did not justify treating those settings as the primary cause without further investigation.
 
-## 10. Engineering Decisions and Trade-offs
+I challenged the explanation and redirected the investigation towards the actual configuration and workflow evidence. This avoided making unnecessary changes based on a diagnosis that was not sufficiently supported.
 
-- **FastAPI:** provides request validation, generated OpenAPI documentation, and a lightweight Python API.
-- **SQLAlchemy:** separates database operations from endpoint logic and supports both SQLite and PostgreSQL.
-- **Serverless backend:** Lambda and API Gateway avoid managing a dedicated application server, but introduce deployment packaging and cold-start considerations.
-- **Cloudflare Workers frontend:** serves the built single-page application independently of the API.
-- **Database constraints:** complement application validation to reduce duplicate active bookings under concurrent requests.
-- **Synthetic seed data:** makes the demo repeatable without depending on real patient information.
-- **Separate CI and deployment jobs:** prevent frontend deployment when required backend checks or frontend builds fail.
+The experience reinforced that generative AI can produce plausible and confident explanations from incomplete context. I found it more useful to treat generated output as a hypothesis, inspect the relevant evidence, and change the implementation only when the evidence justified doing so.
 
-SQLite is convenient for local work, but production concurrency and database behavior must be verified against PostgreSQL.
+## 4.4 Name two decisions you made without AI. Why did you trust your own judgment there?
 
-## 11. Use of AI in Development
+### Decision 1: Not changing hosting settings without evidence
 
-AI was used as a practical engineering aid throughout the assessment, including for generative tasks as well as technical investigation. Generative use was focused on producing and refining working drafts, not on presenting unverified output as finished engineering work. I used it to help develop documentation, organize technical explanations, draft and refine implementation approaches, and turn debugging findings into clearer next steps. Generated suggestions and text were reviewed against the actual repository, requirements, configuration, and available test or deployment evidence.
+I chose not to change the existing Cloudflare settings simply because a troubleshooting explanation suggested they were wrong. I checked the configuration and workflow first.
 
-### Generative use
+I trusted this decision because the repository and deployment configuration provided direct evidence of the current setup. The proposed diagnosis was only a hypothesis. Changing settings without identifying a concrete fault could introduce unnecessary risk and make the original issue harder to isolate.
 
-- **Documentation generation and refinement:** AI helped produce an initial structure and working draft for the README, including the architecture overview, local setup, API summary, deployment notes, trade-offs, security scope, and next steps. I then refined the content against the actual project so it reflected the implemented stack and did not claim that unverified behavior had been tested.
-- **Technical writing and explanation:** AI helped turn implementation and deployment details into readable explanations, including the architecture flow and the reasoning behind selected technologies. The final wording was checked for technical accuracy and for clear separation between implemented features, deployment status, and outstanding work.
-- **Implementation ideas and troubleshooting steps:** AI generated possible explanations and candidate fixes when investigating configuration or deployment behavior. These were treated as options to assess, not instructions to apply blindly. Changes were guided by the repository files and workflow evidence.
+### Decision 2: Separating deployment success from end-to-end verification
 
-### Example 1: correcting the Wrangler deployment configuration
+I chose to document the successful deployment as evidence that the deployment workflow completed, rather than claiming that every booking operation had been verified in production.
 
-An early deployment attempt failed because Wrangler could not locate the expected entry point. AI-assisted investigation helped identify the configuration path as an area to check, and the deployment command was made explicit about using `wrangler.jsonc`. A later run exposed a separate issue: Cloudflare credentials were not available to the deployment job. The required `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` values were configured as secrets in the GitHub `production` environment, after which the deployment workflow completed successfully.
+A deployment log cannot establish that a patient can retrieve doctor availability, book an appointment, cancel it, or reschedule it successfully. Those behaviours require separate tests against the deployed API and database.
 
-The errors had different causes. Fixing the configuration path did not supply deployment credentials, and supplying credentials would not by itself have corrected an invalid Wrangler entry point. The workflow logs were used to distinguish the failures rather than treating the first change as a complete fix.
+I trusted this distinction because it follows from what each check actually measures. It also keeps the README technically accurate by separating a successful deployment from functional verification that remains outstanding.
 
-### Example 2: checking a diagnosis against the actual hosting settings
+## 4.5 Reflection
 
-During troubleshooting, an explanation suggested that existing Cloudflare deployment settings were misconfigured. Rather than changing them immediately, I compared the claim with the repository and workflow. The deployment already targeted `main`, used the `frontend` directory, specified the Wrangler deployment command, and supplied the API URL. That evidence did not support changing those settings as the first response, so the diagnosis was challenged and the investigation was redirected toward the actual failure evidence.
+My approach was to use AI to accelerate investigation, generate drafts and candidate solutions, and improve the clarity of technical documentation while retaining responsibility for engineering decisions.
 
-This was a useful reminder that generative AI can accelerate exploration and suggest plausible leads, but it can also produce a confident explanation from incomplete context. The source configuration and observed results remained the basis for decisions.
+The most useful results came from combining generative assistance with direct inspection of the repository, test output, configuration files, and deployment logs. AI helped me explore options and communicate decisions more efficiently, but it did not remove the need to understand the system or verify the result.
 
-### Review, ownership, and limits
+I remained responsible for deciding which suggestions to use, adapting generated code and documentation to the project, and ensuring that claims in the submission matched the available evidence. I consider that balance important when using AI in day-to-day engineering work.
 
-The working process was iterative: clarify the requirement, inspect relevant code or configuration, consider generated options, select or revise an approach, and check the resulting tests or workflow logs. AI helped with speed and communication, while engineering judgment was still needed to determine whether an answer fit this specific repository.
+---
 
-A passing CI run was treated as evidence that the configured checks passed, not proof that every production user journey worked. Likewise, a successful frontend deployment confirms that the deployment job completed; it does **not** establish that the live application can retrieve doctors, load availability, create appointments, or successfully cancel and reschedule them. Those end-to-end flows still require a deliberate smoke test, and this README does not claim that test has been completed.
+# Security, Limitations, and Future Improvements
 
-The final responsibility for the submitted work, its technical decisions, and the accuracy of its claims remains mine. AI was used to generate drafts, alternatives, and explanations that could be evaluated and improved, while repository state, test output, configuration files, and deployment logs were used to verify technical claims.
+## Security and privacy
 
-## 12. Known Limitations and Next Steps
+This application is a synthetic-data demonstration and should not be used to manage real patient information in its current form.
 
-- Complete and record a live end-to-end smoke test.
-- Verify database readiness and appointment operations against the deployed environment.
-- Expand test coverage for concurrent bookings, the exact one-hour boundary, patient appointment ordering, and PostgreSQL-specific behavior.
-- Review production authentication, authorization, privacy, and audit requirements before handling real patient information.
-- Define backup, recovery, monitoring, and operational procedures before any production use.
+The patient selector is a demonstration convenience, not an authentication mechanism. The application does not implement a complete production identity and authorization model, comprehensive audit controls, or the operational safeguards required for a clinical service.
 
-## 13. References
+Before production use, the system would need appropriate authentication and authorization, patient identity verification, stronger auditability, secret management, monitoring, backup and recovery procedures, and a review of applicable privacy and regulatory requirements.
+
+Private credentials must not be committed to the repository or embedded in frontend build variables.
+
+## Known limitations
+
+- The complete live booking lifecycle still requires a documented end-to-end smoke test.
+- PostgreSQL-specific and concurrent booking behaviour should receive additional verification.
+- The demo patient selector is not suitable for real patient identity or access control.
+- Production authentication, authorization, privacy, and audit requirements remain outside the current demonstration scope.
+- Monitoring, backup, recovery, and operational procedures require further development before production use.
+
+## Future improvements
+
+1. Add a comprehensive end-to-end test suite for booking, cancellation, rescheduling, and slot conflicts.
+2. Expand concurrency tests against PostgreSQL.
+3. Introduce secure authentication and patient-specific authorization.
+4. Add a stronger audit trail and operational monitoring.
+5. Establish backup, recovery, and deployment rollback procedures.
+6. Review database connection management and performance as usage grows.
+
+---
+
+# References
 
 - [FastAPI documentation](https://fastapi.tiangolo.com/)
 - [SQLAlchemy documentation](https://docs.sqlalchemy.org/)
