@@ -8,30 +8,63 @@ from app.database import settings
 from app.models import Appointment, Doctor, DoctorWorkingHour, Patient
 
 CLINIC_TZ = ZoneInfo(settings.clinic_timezone)
+SLOT_MINUTES = 30
 
 def utc(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise HTTPException(422, "Datetime must include a timezone offset")
     return value.astimezone(timezone.utc)
 
+def as_utc(value: datetime) -> datetime:
+    # SQLite drops timezone metadata on DateTime values; persisted values are UTC.
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+def overlaps(start_a: datetime, end_a: datetime, start_b: datetime, end_b: datetime) -> bool:
+    return start_a < end_b and end_a > start_b
+
+def session_accepts(hours: DoctorWorkingHour, local_start: datetime, local_end: datetime) -> bool:
+    start_time = local_start.time().replace(tzinfo=None)
+    end_time = local_end.time().replace(tzinfo=None)
+    if local_end.date() != local_start.date() or start_time < hours.opens_at or end_time > hours.closes_at:
+        return False
+    session_start = datetime.combine(local_start.date(), hours.opens_at, tzinfo=CLINIC_TZ)
+    offset_seconds = (local_start - session_start).total_seconds()
+    if offset_seconds < 0 or offset_seconds % (SLOT_MINUTES * 60) != 0:
+        return False
+    if hours.break_starts_at and hours.break_ends_at:
+        if start_time < hours.break_ends_at and end_time > hours.break_starts_at:
+            return False
+    return True
+
 def validate_slot(db: Session, doctor_id: int, value: datetime, exclude_id: int | None = None):
     start = utc(value)
+    end = start + timedelta(minutes=SLOT_MINUTES)
     if start <= datetime.now(timezone.utc):
         raise HTTPException(422, "Appointment must be in the future")
     local_start = start.astimezone(CLINIC_TZ)
-    local_end = (start + timedelta(minutes=30)).astimezone(CLINIC_TZ)
+    local_end = end.astimezone(CLINIC_TZ)
     doctor = db.get(Doctor, doctor_id)
     if not doctor or not doctor.active:
         raise HTTPException(404, "Doctor not found")
-    hours = db.scalar(select(DoctorWorkingHour).where(DoctorWorkingHour.doctor_id == doctor_id, DoctorWorkingHour.weekday == local_start.weekday()))
-    if not hours or local_start.time().replace(tzinfo=None) < hours.opens_at or local_end.time().replace(tzinfo=None) > hours.closes_at or local_end.date() != local_start.date():
-        raise HTTPException(422, "Requested slot is outside doctor working hours")
-    q = select(Appointment).where(Appointment.doctor_id == doctor_id, Appointment.starts_at == start, Appointment.status == "booked")
+    schedules = db.scalars(
+        select(DoctorWorkingHour).where(
+            DoctorWorkingHour.doctor_id == doctor_id,
+            DoctorWorkingHour.weekday == local_start.weekday(),
+        )
+    ).all()
+    if not any(session_accepts(hours, local_start, local_end) for hours in schedules):
+        raise HTTPException(422, "Requested time is outside doctor working hours, overlaps a break, or is not a 30-minute slot")
+    q = select(Appointment).where(
+        Appointment.doctor_id == doctor_id,
+        Appointment.status == "booked",
+        Appointment.starts_at < end,
+        Appointment.ends_at > start,
+    )
     if exclude_id is not None:
         q = q.where(Appointment.id != exclude_id)
     if db.scalar(q):
-        raise HTTPException(409, "That appointment slot is no longer available")
-    return start, start + timedelta(minutes=30)
+        raise HTTPException(409, "That appointment time overlaps an existing booking")
+    return start, end
 
 def create_appointment(db: Session, doctor_id: int, patient_id: int, starts_at: datetime):
     if not db.get(Patient, patient_id):
@@ -81,20 +114,43 @@ def reschedule_appointment(db: Session, appointment_id: int, starts_at: datetime
 def available_slots(db: Session, doctor_id: int, day: date):
     doctor = db.get(Doctor, doctor_id)
     if not doctor or not doctor.active: raise HTTPException(404, "Doctor not found")
-    hours = db.scalar(select(DoctorWorkingHour).where(DoctorWorkingHour.doctor_id == doctor_id, DoctorWorkingHour.weekday == day.weekday()))
-    if not hours: return []
-    local_cursor = datetime.combine(day, hours.opens_at, tzinfo=CLINIC_TZ)
-    local_closing = datetime.combine(day, hours.closes_at, tzinfo=CLINIC_TZ)
-    utc_open = local_cursor.astimezone(timezone.utc)
-    utc_close = local_closing.astimezone(timezone.utc)
-    booked_values = db.scalars(select(Appointment.starts_at).where(Appointment.doctor_id == doctor_id, Appointment.status == "booked", Appointment.starts_at >= utc_open, Appointment.starts_at < utc_close)).all()
-    booked = {value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc) for value in booked_values}
+    schedules = db.scalars(
+        select(DoctorWorkingHour)
+        .where(DoctorWorkingHour.doctor_id == doctor_id, DoctorWorkingHour.weekday == day.weekday())
+        .order_by(DoctorWorkingHour.opens_at)
+    ).all()
+    if not schedules: return []
+
+    day_start = datetime.combine(day, datetime.min.time(), tzinfo=CLINIC_TZ).astimezone(timezone.utc)
+    day_end = datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=CLINIC_TZ).astimezone(timezone.utc)
+    booked_rows = db.execute(
+        select(Appointment.starts_at, Appointment.ends_at).where(
+            Appointment.doctor_id == doctor_id,
+            Appointment.status == "booked",
+            Appointment.starts_at < day_end,
+            Appointment.ends_at > day_start,
+        )
+    ).all()
+    booked = [(as_utc(start), as_utc(end)) for start, end in booked_rows]
+    now = datetime.now(timezone.utc)
     slots = []
-    while local_cursor + timedelta(minutes=30) <= local_closing:
-        local_end = local_cursor + timedelta(minutes=30)
-        start_utc = local_cursor.astimezone(timezone.utc)
-        end_utc = local_end.astimezone(timezone.utc)
-        if start_utc > datetime.now(timezone.utc) and start_utc not in booked:
-            slots.append({"starts_at": start_utc, "ends_at": end_utc})
-        local_cursor = local_end
+    for hours in schedules:
+        local_cursor = datetime.combine(day, hours.opens_at, tzinfo=CLINIC_TZ)
+        local_closing = datetime.combine(day, hours.closes_at, tzinfo=CLINIC_TZ)
+        while local_cursor + timedelta(minutes=SLOT_MINUTES) <= local_closing:
+            local_end = local_cursor + timedelta(minutes=SLOT_MINUTES)
+            start_utc = local_cursor.astimezone(timezone.utc)
+            end_utc = local_end.astimezone(timezone.utc)
+            start_time = local_cursor.time().replace(tzinfo=None)
+            end_time = local_end.time().replace(tzinfo=None)
+            during_break = bool(
+                hours.break_starts_at and hours.break_ends_at
+                and start_time < hours.break_ends_at and end_time > hours.break_starts_at
+            )
+            if start_utc > now and not during_break and not any(
+                overlaps(start_utc, end_utc, booked_start, booked_end)
+                for booked_start, booked_end in booked
+            ):
+                slots.append({"starts_at": start_utc, "ends_at": end_utc})
+            local_cursor = local_end
     return slots

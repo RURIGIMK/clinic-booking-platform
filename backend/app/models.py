@@ -12,13 +12,16 @@ class Doctor(Base):
     working_hours: Mapped[list["DoctorWorkingHour"]] = relationship(back_populates="doctor", cascade="all, delete-orphan")
 
 class DoctorWorkingHour(Base):
+    """One doctor's clinic session per weekday, with an optional lunch break."""
     __tablename__ = "doctor_working_hours"
     __table_args__ = (UniqueConstraint("doctor_id", "weekday", name="uq_doctor_weekday"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     doctor_id: Mapped[int] = mapped_column(ForeignKey("doctors.id", ondelete="CASCADE"), index=True)
-    weekday: Mapped[int] = mapped_column(nullable=False)
+    weekday: Mapped[int] = mapped_column(nullable=False)  # Monday=0 ... Sunday=6
     opens_at: Mapped[time] = mapped_column(Time, nullable=False)
     closes_at: Mapped[time] = mapped_column(Time, nullable=False)
+    break_starts_at: Mapped[time | None] = mapped_column(Time, nullable=True)
+    break_ends_at: Mapped[time | None] = mapped_column(Time, nullable=True)
     doctor: Mapped[Doctor] = relationship(back_populates="working_hours")
 
 class Patient(Base):

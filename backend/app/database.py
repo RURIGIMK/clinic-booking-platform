@@ -1,5 +1,5 @@
 from collections.abc import Generator
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -18,6 +18,19 @@ engine = create_engine(settings.database_url, **options)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 class Base(DeclarativeBase):
     pass
+
+def ensure_schema_compatibility() -> None:
+    """Add nullable schedule-break columns to existing demo databases without dropping data."""
+    inspector = inspect(engine)
+    if "doctor_working_hours" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("doctor_working_hours")}
+    with engine.begin() as connection:
+        if "break_starts_at" not in columns:
+            connection.execute(text("ALTER TABLE doctor_working_hours ADD COLUMN break_starts_at TIME"))
+        if "break_ends_at" not in columns:
+            connection.execute(text("ALTER TABLE doctor_working_hours ADD COLUMN break_ends_at TIME"))
+
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:

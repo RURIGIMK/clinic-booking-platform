@@ -253,7 +253,7 @@ export default function App() {
             <div className="doctor-line">
               <span><Stethoscope size={19} /></span>
               <div><strong>{doctors.find((doctor) => doctor.id === doctorId)?.name ?? "Loading clinicians"}</strong><small>{doctors.find((doctor) => doctor.id === doctorId)?.specialty ?? "Please wait"}</small></div>
-              <b>Weekdays</b>
+              <b>By schedule</b>
             </div>
 
             <div className="date-row">
@@ -299,8 +299,11 @@ export default function App() {
             <section className="note"><ShieldCheck /><div><strong>Designed around your time</strong><p>Appointments last 30 minutes. A slot is yours once booking is confirmed.</p></div></section>
             <section className="card hours">
               <strong><Clock3 size={15} /> Clinic hours</strong>
-              <p><span>Monday – Friday</span><b>9:00 AM – 5:00 PM</b></p>
+              <p><span>Monday – Friday</span><b>8:00 AM – 5:00 PM</b></p>
+              <p><span>Saturday</span><b>9:00 AM – 1:00 PM</b></p>
+              <p><span>Sunday</span><b>Closed</b></p>
               <p><span>Appointment length</span><b>30 minutes</b></p>
+              <small className="hours-note">Individual doctors may have shorter specialty sessions and a midday break. Available slots reflect each doctor's schedule.</small>
             </section>
           </aside>
         </div>

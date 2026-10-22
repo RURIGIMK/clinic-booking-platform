@@ -7,7 +7,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from app.booking import available_slots, cancel_appointment, create_appointment, reschedule_appointment
-from app.database import Base, engine, get_db, settings
+from app.database import Base, engine, get_db, settings, ensure_schema_compatibility
 from app.models import Appointment, Doctor, Patient
 from app.schemas import AppointmentCreate, AppointmentOut, CancelRequest, DoctorOut, RescheduleRequest, SlotOut
 
@@ -29,7 +29,9 @@ async def request_context(request: Request, call_next):
     return response
 
 @app.on_event("startup")
-def startup(): Base.metadata.create_all(bind=engine)
+def startup():
+    Base.metadata.create_all(bind=engine)
+    ensure_schema_compatibility()
 
 @app.get("/health")
 def health(): return {"status":"ok"}

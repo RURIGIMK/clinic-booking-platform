@@ -57,3 +57,5 @@
   .reschedule-slots{grid-template-columns:repeat(2,minmax(0,1fr))}
   .reschedule-date-row strong{font-size:13px}
 }
+
+.hours-note{display:block;margin-top:10px;color:#71827d;font-size:11px;line-height:1.55}

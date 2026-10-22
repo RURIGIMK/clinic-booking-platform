@@ -6,7 +6,7 @@ A full-stack clinic appointment booking demo for the Implementation Engineer tak
 
 - FastAPI REST API and SQLAlchemy data models committed on feature/booking-foundation.
 - React and TypeScript appointment interface committed.
-- Synthetic seed data and initial booking lifecycle tests committed.
+- Synthetic seed data, specialty-specific doctor schedules, lunch-break handling and booking lifecycle tests committed.
 - GitHub Actions CI workflow committed.
 - Local execution and tests still need to be run and verified before deployment.
 - AWS, Cloudflare and hosted PostgreSQL are intentionally not configured yet.
@@ -69,6 +69,17 @@ Open the URL Vite prints, normally http://localhost:5173. The demo interface use
 
 For hosted deployment, set VITE_API_BASE_URL to the API origin before building. Never put database credentials or private keys in frontend environment variables.
 
+### Scheduling and existing local databases
+
+The seed script reconciles the five synthetic doctors' schedules whenever it runs. Existing SQLite databases receive the two nullable lunch-break columns automatically at API startup; appointment and patient records are not dropped. Run `python backend/seed.py` again to replace the old demo schedules. The seeded schedule is:
+
+- General Practice, Paediatrics and Family Medicine: Monday-Friday 08:00-17:00, lunch 12:00-13:00; Saturday 09:00-13:00.
+- Dermatology: Monday, Tuesday, Thursday and Friday 09:00-16:00, lunch 12:00-13:00.
+- Cardiology: Monday, Wednesday and Friday 09:00-16:00, lunch 12:00-13:00.
+- Sunday: no routine appointments.
+
+Availability and booking validation use the same doctor-specific schedule. Booking requests outside sessions, during lunch, or off the 30-minute grid are rejected.
+
 ### 4. Run checks
 
 From the repository root with the virtual environment active:
@@ -91,6 +102,8 @@ Only describe tests as passing after the commands have actually run successfully
 - Rescheduling validates the destination before updating the existing appointment. A failed database write should roll back the move.
 - All data is synthetic. Authentication, authorization, reminders, payments and clinical records are outside this demo's scope.
 - Incoming timestamps require a timezone offset and are stored in UTC. Working hours are interpreted in the configured clinic timezone, which defaults to Africa/Nairobi. Set CLINIC_TIMEZONE to an appropriate IANA timezone for another clinic and test daylight-saving transitions where applicable.
+- Scheduling assumptions for this demo: general outpatient clinic hours are Monday-Friday 08:00-17:00 and Saturday 09:00-13:00, closed Sunday, with a weekday 12:00-13:00 lunch break. The five synthetic doctors have specialty-specific schedules, so not every doctor is available during every clinic hour. Slots are 30 minutes and starts must align to the advertised half-hour grid.
+- These are configurable demo assumptions, not a universal rule for Kenyan clinics. The KESDI health-services report describes Kenyan facilities as operating on average 6 days a week and outpatient services averaging 12.9 hours a day at facility level. Individual doctor shifts should not be inferred from facility opening hours. See the [KESDI technical report](https://ncpd.go.ke/wp-content/uploads/2022/06/Final-KESDI-Health-Technical-Report-1.pdf), [Kenyatta National Hospital outpatient clinic schedule](https://knh.or.ke/index.php/corporate-outpatient-clinic/) and [Jaramogi Oginga Odinga Teaching and Referral Hospital outpatient hours](https://www.jootrh.go.ke/faqs).
 - Budget target is $0 where feasible and a maximum planned spend of $5/month. Check AWS account eligibility and resource pricing before creating cloud resources.
 
 ## Reliability and security checklist
