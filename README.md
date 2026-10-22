@@ -290,13 +290,34 @@ SQLite is convenient for local work, but production concurrency and database beh
 
 ## 11. Use of AI in Development
 
-AI was used as a supporting tool for implementation discussion, debugging, configuration review, and documentation. Suggestions were treated as hypotheses to verify against repository code, workflow configuration, deployment logs, and actual application behavior.
+AI assistance was used selectively as an engineering aid during the assessment, mainly to discuss implementation options, investigate failures, review configuration, structure documentation, and reason through testing and deployment. It was not treated as an authority on the repository or as proof that a feature worked. I remained responsible for deciding what to change, checking the relevant files, interpreting the results, and distinguishing verified behavior from assumptions.
 
-One concrete deployment issue involved the Wrangler configuration. An initial deployment attempt failed because Wrangler could not locate the entry point. The deployment command was updated to explicitly reference `wrangler.jsonc`. A subsequent attempt exposed missing Cloudflare credentials in the GitHub Actions environment. The required credentials were then configured as GitHub production environment secrets, and the failed deployment jobs were rerun successfully.
+### Where AI assistance was useful
 
-Another useful lesson came from reviewing the hosting settings. The existing Cloudflare configuration already specified the `main` branch, `frontend` directory, build command, Wrangler deployment command, and API URL. A troubleshooting explanation that treated those settings as misconfigured was challenged against the actual configuration. The diagnosis was revised rather than changing settings without evidence.
+- **Planning and implementation review:** used discussion to break the platform into understandable parts, including the React frontend, HTTP API, Lambda handler, database, and deployment workflow. Proposed approaches still needed to fit the existing repository and the assessment requirements before being accepted.
+- **Debugging and configuration:** used AI-assisted investigation to narrow down deployment failures and identify which configuration or workflow evidence needed to be checked. The concrete Wrangler incident below shows both the value and the limits of this approach.
+- **Testing and verification:** used the workflow results and available test commands as evidence when reviewing changes. A passing CI run was treated as evidence that the configured checks passed, not as proof that every production user journey worked.
+- **Documentation:** used assistance to organize the README around the architecture, local setup, API surface, deployment process, trade-offs, security boundaries, and remaining work. The documentation was checked against the repository configuration and the deployment information available at the time.
 
-The engineering approach was to use AI to speed up investigation while checking proposed changes against the source files and workflow results. The final documentation distinguishes a successful deployment from functional verification that still needs to be completed.
+### Example 1: correcting the Wrangler deployment configuration
+
+An early deployment attempt failed because Wrangler could not locate the expected entry point. The deployment configuration was reviewed and the command was made explicit about using `wrangler.jsonc`. A later run then exposed a separate issue: Cloudflare credentials were not available to the deployment job. The required `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` values were configured as secrets in the GitHub `production` environment, after which the deployment workflow completed successfully.
+
+This sequence matters because the errors had different causes. Fixing the configuration path did not supply deployment credentials, and supplying credentials would not by itself have corrected an invalid Wrangler entry point. The workflow logs were used to distinguish the failures rather than treating the first change as a complete fix.
+
+### Example 2: checking a diagnosis against the actual hosting settings
+
+During troubleshooting, an explanation suggested that existing Cloudflare deployment settings were misconfigured. Rather than changing them immediately, the settings were compared with the repository and workflow: the deployment already targeted `main`, used the `frontend` directory, specified the Wrangler deployment command, and supplied the API URL. That evidence did not support changing those settings as the first response, so the diagnosis was challenged and the investigation was redirected toward the actual failure evidence.
+
+The lesson was to verify an explanation against the source configuration before acting on it. AI output can provide a useful lead, but it can also make a confident diagnosis from incomplete context.
+
+### Human review, ownership, and limits
+
+The working process was iterative: understand the requirement, inspect the relevant code or configuration, consider a proposed approach, make or direct a change only when it fit the evidence, and check the resulting tests or workflow logs. AI suggestions were not accepted solely because they sounded plausible. Repository state, test output, configuration files, and deployment logs remained the references for deciding whether a change was justified.
+
+AI assistance did not replace the need to understand the system or verify it. In particular, a successful frontend deployment confirms that the deployment job completed; it does **not** establish that the live application can retrieve doctors, load availability, create appointments, or successfully cancel and reschedule them. Those end-to-end flows still require a deliberate smoke test, and this README does not claim that test has been completed.
+
+The final responsibility for the submitted work, its technical decisions, and the accuracy of its claims remains mine. The aim was to use AI to accelerate investigation and improve clarity while retaining engineering judgment, evidence-based verification, and an explicit account of what remains unverified.
 
 ## 12. Known Limitations and Next Steps
 
