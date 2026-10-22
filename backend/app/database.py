@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     database_url: str = "sqlite:///./clinic_booking.db"
     cors_origins: str = "http://localhost:5173"
+    clinic_timezone: str = "Africa/Nairobi"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     @property
     def allowed_origins(self):

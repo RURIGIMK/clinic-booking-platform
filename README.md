@@ -90,7 +90,7 @@ Only describe tests as passing after the commands have actually run successfully
 - Application availability checks alone cannot prevent simultaneous bookings. The partial unique index is a second line of defense.
 - Rescheduling validates the destination before updating the existing appointment. A failed database write should roll back the move.
 - All data is synthetic. Authentication, authorization, reminders, payments and clinical records are outside this demo's scope.
-- Incoming timestamps require a timezone offset and are normalized to UTC. The first version assumes working-hour clock times are UTC. A real clinic must configure an IANA timezone and daylight-saving behavior.
+- Incoming timestamps require a timezone offset and are stored in UTC. Working hours are interpreted in the configured clinic timezone, which defaults to Africa/Nairobi. Set CLINIC_TIMEZONE to an appropriate IANA timezone for another clinic and test daylight-saving transitions where applicable.
 - Budget target is $0 where feasible and a maximum planned spend of $5/month. Check AWS account eligibility and resource pricing before creating cloud resources.
 
 ## Reliability and security checklist
