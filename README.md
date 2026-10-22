@@ -290,34 +290,33 @@ SQLite is convenient for local work, but production concurrency and database beh
 
 ## 11. Use of AI in Development
 
-AI assistance was used selectively as an engineering aid during the assessment, mainly to discuss implementation options, investigate failures, review configuration, structure documentation, and reason through testing and deployment. It was not treated as an authority on the repository or as proof that a feature worked. I remained responsible for deciding what to change, checking the relevant files, interpreting the results, and distinguishing verified behavior from assumptions.
+AI was used as a practical engineering aid throughout the assessment, including for generative tasks as well as technical investigation. Generative use was focused on producing and refining working drafts, not on presenting unverified output as finished engineering work. I used it to help develop documentation, organize technical explanations, draft and refine implementation approaches, and turn debugging findings into clearer next steps. Generated suggestions and text were reviewed against the actual repository, requirements, configuration, and available test or deployment evidence.
 
-### Where AI assistance was useful
+### Generative use
 
-- **Planning and implementation review:** used discussion to break the platform into understandable parts, including the React frontend, HTTP API, Lambda handler, database, and deployment workflow. Proposed approaches still needed to fit the existing repository and the assessment requirements before being accepted.
-- **Debugging and configuration:** used AI-assisted investigation to narrow down deployment failures and identify which configuration or workflow evidence needed to be checked. The concrete Wrangler incident below shows both the value and the limits of this approach.
-- **Testing and verification:** used the workflow results and available test commands as evidence when reviewing changes. A passing CI run was treated as evidence that the configured checks passed, not as proof that every production user journey worked.
-- **Documentation:** used assistance to organize the README around the architecture, local setup, API surface, deployment process, trade-offs, security boundaries, and remaining work. The documentation was checked against the repository configuration and the deployment information available at the time.
+- **Documentation generation and refinement:** AI helped produce an initial structure and working draft for the README, including the architecture overview, local setup, API summary, deployment notes, trade-offs, security scope, and next steps. I then refined the content against the actual project so it reflected the implemented stack and did not claim that unverified behavior had been tested.
+- **Technical writing and explanation:** AI helped turn implementation and deployment details into readable explanations, including the architecture flow and the reasoning behind selected technologies. The final wording was checked for technical accuracy and for clear separation between implemented features, deployment status, and outstanding work.
+- **Implementation ideas and troubleshooting steps:** AI generated possible explanations and candidate fixes when investigating configuration or deployment behavior. These were treated as options to assess, not instructions to apply blindly. Changes were guided by the repository files and workflow evidence.
 
 ### Example 1: correcting the Wrangler deployment configuration
 
-An early deployment attempt failed because Wrangler could not locate the expected entry point. The deployment configuration was reviewed and the command was made explicit about using `wrangler.jsonc`. A later run then exposed a separate issue: Cloudflare credentials were not available to the deployment job. The required `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` values were configured as secrets in the GitHub `production` environment, after which the deployment workflow completed successfully.
+An early deployment attempt failed because Wrangler could not locate the expected entry point. AI-assisted investigation helped identify the configuration path as an area to check, and the deployment command was made explicit about using `wrangler.jsonc`. A later run exposed a separate issue: Cloudflare credentials were not available to the deployment job. The required `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` values were configured as secrets in the GitHub `production` environment, after which the deployment workflow completed successfully.
 
-This sequence matters because the errors had different causes. Fixing the configuration path did not supply deployment credentials, and supplying credentials would not by itself have corrected an invalid Wrangler entry point. The workflow logs were used to distinguish the failures rather than treating the first change as a complete fix.
+The errors had different causes. Fixing the configuration path did not supply deployment credentials, and supplying credentials would not by itself have corrected an invalid Wrangler entry point. The workflow logs were used to distinguish the failures rather than treating the first change as a complete fix.
 
 ### Example 2: checking a diagnosis against the actual hosting settings
 
-During troubleshooting, an explanation suggested that existing Cloudflare deployment settings were misconfigured. Rather than changing them immediately, the settings were compared with the repository and workflow: the deployment already targeted `main`, used the `frontend` directory, specified the Wrangler deployment command, and supplied the API URL. That evidence did not support changing those settings as the first response, so the diagnosis was challenged and the investigation was redirected toward the actual failure evidence.
+During troubleshooting, an explanation suggested that existing Cloudflare deployment settings were misconfigured. Rather than changing them immediately, I compared the claim with the repository and workflow. The deployment already targeted `main`, used the `frontend` directory, specified the Wrangler deployment command, and supplied the API URL. That evidence did not support changing those settings as the first response, so the diagnosis was challenged and the investigation was redirected toward the actual failure evidence.
 
-The lesson was to verify an explanation against the source configuration before acting on it. AI output can provide a useful lead, but it can also make a confident diagnosis from incomplete context.
+This was a useful reminder that generative AI can accelerate exploration and suggest plausible leads, but it can also produce a confident explanation from incomplete context. The source configuration and observed results remained the basis for decisions.
 
-### Human review, ownership, and limits
+### Review, ownership, and limits
 
-The working process was iterative: understand the requirement, inspect the relevant code or configuration, consider a proposed approach, make or direct a change only when it fit the evidence, and check the resulting tests or workflow logs. AI suggestions were not accepted solely because they sounded plausible. Repository state, test output, configuration files, and deployment logs remained the references for deciding whether a change was justified.
+The working process was iterative: clarify the requirement, inspect relevant code or configuration, consider generated options, select or revise an approach, and check the resulting tests or workflow logs. AI helped with speed and communication, while engineering judgment was still needed to determine whether an answer fit this specific repository.
 
-AI assistance did not replace the need to understand the system or verify it. In particular, a successful frontend deployment confirms that the deployment job completed; it does **not** establish that the live application can retrieve doctors, load availability, create appointments, or successfully cancel and reschedule them. Those end-to-end flows still require a deliberate smoke test, and this README does not claim that test has been completed.
+A passing CI run was treated as evidence that the configured checks passed, not proof that every production user journey worked. Likewise, a successful frontend deployment confirms that the deployment job completed; it does **not** establish that the live application can retrieve doctors, load availability, create appointments, or successfully cancel and reschedule them. Those end-to-end flows still require a deliberate smoke test, and this README does not claim that test has been completed.
 
-The final responsibility for the submitted work, its technical decisions, and the accuracy of its claims remains mine. The aim was to use AI to accelerate investigation and improve clarity while retaining engineering judgment, evidence-based verification, and an explicit account of what remains unverified.
+The final responsibility for the submitted work, its technical decisions, and the accuracy of its claims remains mine. AI was used to generate drafts, alternatives, and explanations that could be evaluated and improved, while repository state, test output, configuration files, and deployment logs were used to verify technical claims.
 
 ## 12. Known Limitations and Next Steps
 
