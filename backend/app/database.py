@@ -13,8 +13,21 @@ class Settings(BaseSettings):
         return [v.strip() for v in self.cors_origins.split(",") if v.strip()]
 
 settings = Settings()
-options = {"connect_args": {"check_same_thread": False}} if settings.database_url.startswith("sqlite") else {"pool_pre_ping": True, "pool_recycle": 300}
-engine = create_engine(settings.database_url, **options)
+
+database_url = settings.database_url
+
+if database_url.startswith("postgres://"):
+    database_url = "postgresql+psycopg://" + database_url[len("postgres://"):]
+elif database_url.startswith("postgresql://"):
+    database_url = "postgresql+psycopg://" + database_url[len("postgresql://"):]
+
+options = (
+    {"connect_args": {"check_same_thread": False}}
+    if database_url.startswith("sqlite")
+    else {"pool_pre_ping": True, "pool_recycle": 300}
+)
+
+engine = create_engine(database_url, **options)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 class Base(DeclarativeBase):
     pass
