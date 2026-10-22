@@ -17,6 +17,7 @@ The application uses synthetic patient and doctor data. It is a demonstration sy
 - Doctor availability based on configured working hours.
 - Thirty-minute appointment slots.
 - Lunch-break and working-hour validation.
+- One-hour minimum advance notice for booking and rescheduling. A slot exactly one hour ahead is permitted.
 - Appointment creation, cancellation, and rescheduling.
 - Conflict detection for overlapping appointments.
 - Timezone-aware appointment handling.
@@ -135,7 +136,7 @@ These are illustrative application settings, not a statement of standard operati
 
 The backend validates that an appointment:
 
-1. Is in the future.
+1. Is at least one hour ahead of the current UTC time. A slot exactly one hour ahead is permitted.
 2. Belongs to an active doctor and an existing demo patient.
 3. Fits the doctor's configured working hours.
 4. Does not overlap a lunch break.
@@ -253,7 +254,7 @@ Deployment success confirms that the frontend deployment job completed. End-to-e
 
 ## 8. Testing Strategy
 
-The project includes automated backend tests and a frontend production build check.
+The project includes automated backend tests and a frontend production build check. The backend tests include coverage for rejecting bookings within the one-hour notice window, accepting a valid booking more than one hour ahead, and rejecting a reschedule into that window.
 
 The CI workflow currently runs:
 
@@ -322,7 +323,7 @@ The final responsibility for the submitted work, its technical decisions, and th
 
 - Complete and record a live end-to-end smoke test.
 - Verify database readiness and appointment operations against the deployed environment.
-- Expand test coverage for concurrent bookings and PostgreSQL-specific behavior.
+- Expand test coverage for concurrent bookings, the exact one-hour boundary, patient appointment ordering, and PostgreSQL-specific behavior.
 - Review production authentication, authorization, privacy, and audit requirements before handling real patient information.
 - Define backup, recovery, monitoring, and operational procedures before any production use.
 
