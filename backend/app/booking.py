@@ -39,8 +39,8 @@ def session_accepts(hours: DoctorWorkingHour, local_start: datetime, local_end: 
 def validate_slot(db: Session, doctor_id: int, value: datetime, exclude_id: int | None = None):
     start = utc(value)
     end = start + timedelta(minutes=SLOT_MINUTES)
-    if start <= datetime.now(timezone.utc):
-        raise HTTPException(422, "Appointment must be in the future")
+    if start < datetime.now(timezone.utc) + timedelta(hours=1):
+        raise HTTPException(422, "Appointments must be booked at least one hour in advance")
     local_start = start.astimezone(CLINIC_TZ)
     local_end = end.astimezone(CLINIC_TZ)
     doctor = db.get(Doctor, doctor_id)
@@ -132,7 +132,7 @@ def available_slots(db: Session, doctor_id: int, day: date):
         )
     ).all()
     booked = [(as_utc(start), as_utc(end)) for start, end in booked_rows]
-    now = datetime.now(timezone.utc)
+    booking_cutoff = datetime.now(timezone.utc) + timedelta(hours=1)
     slots = []
     for hours in schedules:
         local_cursor = datetime.combine(day, hours.opens_at, tzinfo=CLINIC_TZ)
@@ -147,7 +147,7 @@ def available_slots(db: Session, doctor_id: int, day: date):
                 hours.break_starts_at and hours.break_ends_at
                 and start_time < hours.break_ends_at and end_time > hours.break_starts_at
             )
-            if start_utc > now and not during_break and not any(
+            if start_utc >= booking_cutoff and not during_break and not any(
                 overlaps(start_utc, end_utc, booked_start, booked_end)
                 for booked_start, booked_end in booked
             ):

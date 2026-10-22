@@ -29,6 +29,28 @@ def test_naive_datetime_rejected(client, seeded):
 def test_past_slot_rejected(client, seeded):
     assert client.post("/appointments", json=body(seeded, datetime.now(timezone.utc) - timedelta(days=1))).status_code == 422
 
+
+def test_booking_within_one_hour_is_rejected(client, seeded):
+    starts_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+    response = client.post("/appointments", json=body(seeded, starts_at))
+    assert response.status_code == 422
+    assert "one hour in advance" in response.json()["detail"]
+
+def test_booking_more_than_one_hour_ahead_is_allowed(client, seeded):
+    response = client.post("/appointments", json=body(seeded, slot(days=3)))
+    assert response.status_code == 201
+
+def test_reschedule_within_one_hour_is_rejected(client, seeded):
+    original = slot(days=3)
+    item = client.post("/appointments", json=body(seeded, original)).json()
+    target = datetime.now(timezone.utc) + timedelta(minutes=30)
+    response = client.patch(
+        f"/appointments/{item['id']}/reschedule",
+        json={"starts_at": target.isoformat()},
+    )
+    assert response.status_code == 422
+    assert "one hour in advance" in response.json()["detail"]
+
 def test_unknown_doctor(client, seeded):
     payload = body(seeded, slot())
     payload["doctor_id"] = 999
