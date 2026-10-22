@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+node_modules/
+dist/
+.env
+!.env.example
+*.sqlite3
+*.db
+.DS_Store
+
+# Generated Python package metadata and TypeScript build information
+*.egg-info/
+*.tsbuildinfo
+
+# Local Python virtual environments
+venv/
+
+build/
