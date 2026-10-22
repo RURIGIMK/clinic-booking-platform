@@ -16,3 +16,5 @@ dist/
 
 # Local Python virtual environments
 venv/
+
+build/
