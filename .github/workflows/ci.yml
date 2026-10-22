@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 on:
   pull_request:
     branches: [main]
@@ -27,5 +27,35 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+        env:
+          VITE_API_BASE_URL: https://yfk5o3gvki.execute-api.eu-west-2.amazonaws.com
+  deploy-frontend:
+    name: Deploy frontend to Cloudflare Workers
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_API_BASE_URL: https://yfk5o3gvki.execute-api.eu-west-2.amazonaws.com
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: frontend
+          command: deploy
