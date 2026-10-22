@@ -6,7 +6,11 @@ type Slot = { starts_at: string; ends_at: string };
 type Appointment = { id: number; doctor_id: number; patient_id: number; starts_at: string; ends_at: string; status: string };
 
 const API = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
-const PATIENT = 1;
+const DEMO_PATIENTS = [
+  { id: 1, name: "Alex Sample" },
+  { id: 2, name: "Jordan Example" },
+  { id: 3, name: "Taylor Demo" },
+];
 const CLINIC_TIME_ZONE = "Africa/Nairobi";
 
 // SQLite can return UTC timestamps without an offset. Treat those as UTC rather
@@ -54,6 +58,7 @@ const clinicDateAsLocalDate = (value: string) => {
 export default function App() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [doctorId, setDoctorId] = useState(1);
+  const [patientId, setPatientId] = useState(1);
   const [day, setDay] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -88,7 +93,7 @@ export default function App() {
 
   async function refreshAppointments() {
     try {
-      setAppointments(await api<Appointment[]>("/patients/" + PATIENT + "/appointments"));
+      setAppointments(await api<Appointment[]>("/patients/" + patientId + "/appointments"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load appointments.");
     }
@@ -110,8 +115,11 @@ export default function App() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : "API unavailable. Start the backend and retry."))
       .finally(() => setLoading(false));
-    void refreshAppointments();
   }, []);
+
+  useEffect(() => {
+    void refreshAppointments();
+  }, [patientId]);
 
   useEffect(() => {
     if (doctorId) {
@@ -151,7 +159,7 @@ export default function App() {
     try {
       await api("/appointments", {
         method: "POST",
-        body: JSON.stringify({ doctor_id: doctorId, patient_id: PATIENT, starts_at: selected.starts_at }),
+        body: JSON.stringify({ doctor_id: doctorId, patient_id: patientId, starts_at: selected.starts_at }),
       });
       setNotice("Appointment confirmed.");
       setSelected(null);
@@ -241,6 +249,20 @@ export default function App() {
 
         {error && <div className="alert error" role="alert"><X size={16} /><span>{error}</span><button onClick={() => { setError(""); void refreshSlots(); void refreshAppointments(); }}>Retry</button></div>}
         {notice && <div className="alert success" role="status"><Check size={16} /><span>{notice}</span><button onClick={() => setNotice("")}>Dismiss</button></div>}
+
+        <section className="card patient-switcher" aria-label="Demo patient selector">
+          <div className="patient-switcher-copy">
+            <small>DEMO MODE</small>
+            <strong>Testing patient</strong>
+            <span>Switch synthetic profiles to verify booking isolation and double-booking protection.</span>
+          </div>
+          <div className="patient-switcher-control">
+            <label htmlFor="patient">Patient profile</label>
+            <select id="patient" value={patientId} disabled={busy} onChange={(event) => { setPatientId(Number(event.target.value)); setError(""); setNotice(""); }}>
+              {DEMO_PATIENTS.map((patient) => <option key={patient.id} value={patient.id}>{patient.name} · Patient #{patient.id}</option>)}
+            </select>
+          </div>
+        </section>
 
         <div className="layout">
           <section className="card booking">
