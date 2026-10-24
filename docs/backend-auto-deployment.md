@@ -12,6 +12,12 @@ This repository deploys the backend to the existing AWS Lambda function and then
 
 The workflow deliberately does not create or alter database tables. Database schema changes need a separate, reviewed migration plan.
 
+## Cloudflare Workers Builds configuration
+
+The Cloudflare Worker is configured with `frontend` as its root directory. Its build command is `npm run build`, and its deploy command must be `npx wrangler deploy`. Do not use `npx wrangler dev` as the deploy command: `wrangler dev` starts a local development server and waits for requests, so a hosted build can time out while the server remains running.
+
+The repository's `frontend/wrangler.jsonc` specifies the Worker entry point and the `dist` assets directory. Cloudflare should use that configuration when running the deploy command. The frontend build receives `VITE_API_BASE_URL` as a build-time variable; the production value is `https://yfk5o3gvki.execute-api.eu-west-2.amazonaws.com`.
+
 ## Step 1: Verify the existing Lambda
 
 The existing Lambda is:
