@@ -65,15 +65,25 @@ The development and deployment workflow is separate from the runtime request flo
             |                 |
             +--------+--------+
                      |
-           Both checks succeed
-                     |
               Push to main
                      |
                      v
-          Cloudflare deployment
+          AWS OIDC Authentication
+                     |
+                     v
+             Deploy AWS Lambda
+                     |
+                     v
+          API Smoke Tests: /health
+                and /ready
+                     |
+              Both succeed
+                     |
+                     v
+        Deploy Frontend to Cloudflare
 ```
 
-The backend and frontend are independently deployable. This allows the user interface to be updated without requiring the API to be hosted on the same server.
+The backend and frontend are independently deployable. **The production workflow coordinates their deployment order: it runs the configured checks, deploys the backend on pushes to `main`, and verifies the deployed API using `/health` and `/ready`. The frontend deployment proceeds only after the required checks, backend deployment, and API smoke tests succeed.**
 
 ## 1.3 Data Models
 
@@ -335,30 +345,40 @@ The backend job installs the Python project with its development dependencies, r
 
 The frontend job installs dependencies using `npm ci` and builds the production frontend using `npm run build`.
 
-For a push to `main`, the deployment job waits for both the backend and frontend jobs to succeed. It then builds the frontend with the configured API URL and deploys it to Cloudflare Workers using Wrangler and `frontend/wrangler.jsonc`.
+**Pull requests and feature branch pushes run the configured checks but do not deploy the application. Deployment jobs run on pushes to `main`.**
 
-The deployment job uses the GitHub Actions `production` environment and requires these secrets:
+**For a push to `main`, the backend deployment job runs after the backend checks succeed. It authenticates to AWS using GitHub Actions OpenID Connect (OIDC), verifies that the Lambda function uses Python 3.12 and the `x86_64` architecture, packages the backend application and its Lambda dependencies, and updates the `clinic-booking-api` Lambda function.**
+
+**After the Lambda update, the workflow waits for the function update to complete and runs API smoke tests against `/health` and `/ready`. The frontend deployment depends on the backend checks, frontend build, and successful backend deployment job, including its smoke tests. This prevents the frontend deployment from proceeding when the backend deployment or its smoke tests fail.**
+
+**The frontend is built with `VITE_API_BASE_URL` set to the production API origin and deployed to Cloudflare Workers using Wrangler and `frontend/wrangler.jsonc`.**
+
+**The deployment jobs use the GitHub Actions `production` environment. The backend deployment requires the `AWS_DEPLOY_ROLE_ARN` secret and the `AWS_LAMBDA_FUNCTION_NAME` environment variable. The frontend deployment requires these secrets:**
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-The values are configured in the repository's GitHub environment settings rather than committed to source control.
+**These values are configured in the GitHub environment settings rather than committed to source control. AWS authentication uses OIDC instead of storing long-lived AWS access keys in the repository.**
 
 ### Deployment trigger
 
 **Branch:** `main`
 
-**Trigger:** A push to `main`, including a merge that updates the branch, initiates the workflow. The deployment job runs only after the backend and frontend checks pass.
+**Trigger:** A push to `main`, including a merge that updates the branch, initiates the workflow. The deployment jobs run only for pushes to `main` and only after their configured dependencies succeed.
 
-This means a successful pull request check alone does not deploy the frontend. The deployment is tied to the subsequent push to `main`.
+**A successful pull request check alone does not deploy the application. The production deployment is tied to the subsequent push to `main`.**
 
 ## 3.4 Deployment Troubleshooting
 
+**The deployment process encountered separate issues at different stages.**
+
 During deployment, Wrangler initially failed to locate the expected entry point. The deployment command was updated to explicitly reference `wrangler.jsonc`.
 
-A later run exposed a separate issue involving missing Cloudflare credentials in the GitHub Actions environment. The required secrets were configured in the `production` environment, and the deployment workflow subsequently completed successfully.
+**A later backend deployment attempt failed during AWS OIDC authentication with the error `Not authorized to perform sts:AssumeRoleWithWebIdentity`. The issue was related to the AWS IAM role trust policy and the GitHub Actions OIDC subject claim. The repository's GitHub OIDC configuration used immutable subject claims, so the trust policy needed to match the subject format used by the workflow's `production` environment.**
 
-This demonstrated why deployment failures need to be diagnosed from their specific error messages. Correcting the configuration path and providing deployment credentials addressed different problems.
+**After the trust policy was corrected, a subsequent workflow run successfully assumed the AWS role, verified the Lambda runtime and architecture, updated the Lambda code, and passed the `/health` and `/ready` smoke tests.**
+
+**These incidents illustrate the importance of diagnosing each deployment failure from its specific error message. The Wrangler configuration path and AWS OIDC trust policy were separate issues and required separate corrections. Successful API smoke tests confirm that the deployed API responded and that the readiness check passed at the time of the run. They do not, by themselves, prove that every booking operation works end to end.**
 
 ## 3.5 Local Development
 
@@ -445,9 +465,9 @@ The same categories of backend checks and frontend build are configured in GitHu
 
 ## 3.6 Operational Verification
 
-A successful deployment confirms that the deployment job completed. It does not by itself prove that every application feature works against the live API and database.
+**The production deployment workflow successfully updated the backend Lambda function and passed its `/health` and `/ready` smoke tests. The health endpoint returned `{"status":"ok"}`, while the readiness endpoint returned `{"status":"ready"}`. This confirms that the API responded and the readiness check reported database connectivity at the time of the run. It does not establish that every application feature has been tested against the live environment.**
 
-A complete manual smoke test should verify:
+**A complete manual smoke test should verify the following behaviours before claiming that the full booking lifecycle has been verified in production:**
 
 1. The live frontend loads.
 2. The doctor directory is retrieved from the API.
@@ -459,9 +479,7 @@ A complete manual smoke test should verify:
 8. Rescheduling validates the destination and releases the original slot.
 9. The readiness endpoint reports database connectivity.
 
-The live application URL is published above, but these end-to-end checks should only be described as complete after they have actually been run and their results recorded.
-
----
+**The live application URL is published above, but the end-to-end checks should only be described as complete after they have actually been run and their results recorded. The successful deployment and API smoke tests should not be treated as evidence that every item in this manual test list has passed.**
 
 # Section 4: AI Reflection
 
