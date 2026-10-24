@@ -263,6 +263,69 @@ The API is designed to keep HTTP request handling separate from the booking logi
 
 Interactive API documentation is available at `/docs` when running the backend locally.
 
+### Example API requests
+
+Set the base URL to the deployed API or your local API. The examples use the seeded demonstration IDs as a starting point; confirm the actual IDs from `GET /doctors` and your seeded patient records before submitting a booking. IDs in a persistent database are not guaranteed to remain `1`.
+
+```bash
+API_BASE_URL="https://yfk5o3gvki.execute-api.eu-west-2.amazonaws.com"
+DOCTOR_ID=1
+PATIENT_ID=1
+APPOINTMENT_ID=1
+DATE="YYYY-MM-DD" # Choose a future date with working hours for this doctor
+```
+
+List doctors:
+
+```bash
+curl --fail-with-body "$API_BASE_URL/doctors"
+```
+
+Check availability. Use a future date with a working session for the selected doctor, then copy a returned `starts_at` value for the booking request:
+
+```bash
+curl --fail-with-body "$API_BASE_URL/doctors/$DOCTOR_ID/availability?date=$DATE"
+```
+
+Book an appointment. Replace the example timestamp with an available slot returned by the preceding request. The timestamp must include a timezone offset:
+
+```bash
+curl --fail-with-body -X POST "$API_BASE_URL/appointments" \
+  -H "Content-Type: application/json" \
+  -d '{"doctor_id":1,"patient_id":1,"starts_at":"2026-10-26T10:00:00+03:00"}'
+```
+
+List upcoming booked appointments for a patient:
+
+```bash
+curl --fail-with-body "$API_BASE_URL/patients/$PATIENT_ID/appointments"
+```
+
+Cancel an appointment. Use an existing appointment ID and a reason of 3 to 500 characters:
+
+```bash
+curl --fail-with-body -X PATCH "$API_BASE_URL/appointments/$APPOINTMENT_ID/cancel" \
+  -H "Content-Type: application/json" \
+  -d '{"reason":"Schedule changed"}'
+```
+
+Reschedule an active appointment. Replace the timestamp with a different available slot that satisfies the booking rules:
+
+```bash
+curl --fail-with-body -X PATCH "$API_BASE_URL/appointments/$APPOINTMENT_ID/reschedule" \
+  -H "Content-Type: application/json" \
+  -d '{"starts_at":"2026-10-26T11:00:00+03:00"}'
+```
+
+Check service health and database connectivity:
+
+```bash
+curl --fail-with-body "$API_BASE_URL/health"
+curl --fail-with-body "$API_BASE_URL/ready"
+```
+
+The timestamps above are illustrative examples, not a guarantee that those slots are currently available. Use the live availability response before creating or rescheduling an appointment. Do not run booking, cancellation, or rescheduling examples against production unless you intend to create or modify a demonstration record.
+
 ## 2.3 Validation and Error Handling
 
 The API distinguishes invalid input, missing resources, and booking conflicts through HTTP status codes.
