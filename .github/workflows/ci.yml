@@ -1,11 +1,14 @@
 name: CI/CD
+
 on:
   pull_request:
     branches: [main]
   push:
     branches: [main, "feature/**"]
+
 permissions:
   contents: read
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -17,6 +20,7 @@ jobs:
       - run: python -m pip install -e ".[dev]"
       - run: ruff check backend --select F821,F822,F823,F811
       - run: pytest
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -33,10 +37,92 @@ jobs:
       - run: npm run build
         env:
           VITE_API_BASE_URL: https://yfk5o3gvki.execute-api.eu-west-2.amazonaws.com
+
+  deploy-backend:
+    name: Deploy backend to AWS Lambda
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: eu-west-2
+      LAMBDA_FUNCTION_NAME: ${{ vars.AWS_LAMBDA_FUNCTION_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure AWS credentials using GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify Lambda configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${LAMBDA_FUNCTION_NAME}" ]]; then
+            echo "::error::Set AWS_LAMBDA_FUNCTION_NAME as a production environment variable."
+            exit 1
+          fi
+          ARCH="$(aws lambda get-function-configuration --function-name "$LAMBDA_FUNCTION_NAME" --query 'Architectures[0]' --output text)"
+          RUNTIME="$(aws lambda get-function-configuration --function-name "$LAMBDA_FUNCTION_NAME" --query 'Runtime' --output text)"
+          echo "Lambda runtime: $RUNTIME"
+          echo "Lambda architecture: $ARCH"
+          if [[ "$RUNTIME" != "python3.12" ]]; then
+            echo "::error::Expected Lambda runtime python3.12; found $RUNTIME."
+            exit 1
+          fi
+          if [[ "$ARCH" != "x86_64" ]]; then
+            echo "::error::This packaging job targets x86_64. Set the Lambda architecture to x86_64 or update the build target before deployment."
+            exit 1
+          fi
+
+      - name: Build Lambda deployment package
+        run: |
+          set -euo pipefail
+          rm -rf build lambda-deployment.zip
+          mkdir -p build
+          python -m pip install \
+            --target build \
+            --requirement backend/requirements-lambda.txt \
+            --platform manylinux2014_x86_64 \
+            --implementation cp \
+            --python-version 3.12 \
+            --abi cp312 \
+            --only-binary=:all:
+          cp -R backend/app build/app
+          cd build
+          zip -qr ../lambda-deployment.zip .
+
+      - name: Update Lambda code
+        run: |
+          set -euo pipefail
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --zip-file fileb://lambda-deployment.zip
+          aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION_NAME"
+
+      - name: Smoke test deployed API
+        shell: bash
+        run: |
+          set -euo pipefail
+          API_BASE_URL="https://yfk5o3gvki.execute-api.eu-west-2.amazonaws.com"
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 "$API_BASE_URL/health"
+          echo
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 "$API_BASE_URL/ready"
+          echo
+
   deploy-frontend:
     name: Deploy frontend to Cloudflare Workers
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [backend, frontend]
+    needs: [backend, frontend, deploy-backend]
     runs-on: ubuntu-latest
     environment: production
     defaults:
