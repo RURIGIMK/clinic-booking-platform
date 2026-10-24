@@ -483,64 +483,67 @@ The same categories of backend checks and frontend build are configured in GitHu
 
 # Section 4: AI Reflection
 
-## 4.1 What did you use AI for across the four sections?
+## 4.1 What did I use AI for?
 
-I used AI as both a generative tool and an engineering assistant throughout the assessment. Its generative use included drafting and refining code, developing candidate implementation approaches, producing technical explanations, and creating documentation. I also used it to investigate errors, review configuration, and reason through testing and deployment.
+I used AI throughout the implementation process as a development assistant. This included discussing the data model and system architecture, developing parts of the backend and frontend implementation, reviewing API logic, suggesting test cases, troubleshooting deployment issues, and improving the README and supporting documentation.
 
-- **Section 1, System Design:** I used AI to explore architecture options, organize the relationships between the application components, and develop explanations of the data models, booking rules, and design trade-offs. I reviewed the resulting design against the scenario and the implementation requirements.
-- **Section 2, API Implementation:** I used AI to discuss implementation approaches and generate candidate code or technical solutions where useful. I treated generated output as a starting point that needed to fit the existing codebase, validation rules, and application structure.
-- **Section 3, Deployment and CI/CD:** I used AI to investigate deployment failures, explore configuration issues, and identify possible fixes. I checked the suggestions against the repository, workflow configuration, and deployment logs.
-- **Section 4, Documentation and Reflection:** I used AI generatively to draft and refine the README, architecture explanations, local setup instructions, deployment guidance, engineering trade-offs, and this reflection. I reviewed the documentation against the actual implementation and distinguished verified behaviour from work that remained unverified.
+For the design, I used AI to evaluate possible approaches and identify technical trade-offs, particularly around data integrity and the relationship between application-level validation and database constraints. I considered its suggestions against the project requirements before deciding which approaches to retain.
 
-Generative AI was particularly useful for moving from a blank page to a structured draft, exploring alternative approaches quickly, and improving the clarity of technical explanations. Its output still required review, adaptation, and verification before being used in the submission.
+For the API implementation, AI helped me work through booking and availability logic, validation, error handling, and testing. I reviewed the suggested implementation and checked it against the expected behaviour. Appointment validation, time handling, and booking conflicts required particular attention because incorrect assumptions could affect the availability of appointment slots.
 
-## 4.2 Give one example where an AI suggestion improved your work. What did you prompt it with?
+For deployment, I used AI to investigate AWS Lambda packaging, GitHub Actions configuration, OpenID Connect (OIDC) authentication, and Cloudflare deployment issues. This required more troubleshooting than I initially expected because solutions based on common configurations did not always account for the specific settings used by my repository and deployment environment.
 
-An example was investigating the Wrangler deployment failure. An early deployment attempt failed because Wrangler could not locate the expected entry point. Reviewing the deployment command alongside the repository configuration identified the configuration path as an area to correct. The deployment command was made explicit about using `wrangler.jsonc`.
+I also used AI to improve the wording and organisation of the README and deployment documentation. I remained responsible for checking the consistency of the documented implementation, the deployment configuration, and the claims made about what had been verified.
 
-A representative prompt for this investigation would be:
+## 4.2 One suggestion that improved my work
 
-> Review the frontend deployment configuration and GitHub Actions workflow. Identify why Wrangler may not be locating the expected entry point, and suggest the smallest change consistent with the existing project structure.
+One useful suggestion was to use GitHub OIDC to authenticate the deployment workflow to AWS rather than relying on long-lived AWS access keys stored in GitHub secrets.
 
-This is a representative reconstruction of the prompt, not a claim that it reproduces the original wording verbatim.
+This approach establishes a trust relationship between GitHub Actions and AWS, allowing the workflow to obtain temporary credentials. It avoids maintaining long-lived AWS credentials in the repository and allows the deployment role to be restricted to the resources and actions required by the workflow.
 
-The suggestion helped narrow the investigation to the relationship between the deployment command and the configuration file. A subsequent run exposed a separate missing-credentials issue. After the required Cloudflare secrets were configured in the GitHub `production` environment, the deployment workflow completed successfully.
+I also considered the compatibility of the AWS Lambda runtime and architecture when packaging the backend. Dependencies containing compiled components must be compatible with the target execution environment. A packaging process can complete successfully while an incompatible dependency still causes the function to fail when it starts.
 
-The improvement came from using AI to narrow the investigation and then checking the proposed direction against the actual repository and workflow evidence. The two deployment errors had different causes, so resolving one did not automatically resolve the other.
+I retained these considerations because they address practical deployment and security risks. However, the configuration still needed to be checked against the actual repository settings, permissions, runtime, and deployment process rather than accepted solely because AI suggested it.
 
-## 4.3 Give one example where AI output was wrong or incomplete and how you caught it.
+**Prompt used:**
 
-During deployment troubleshooting, an AI-generated explanation suggested that the existing Cloudflare deployment settings were misconfigured.
+"I am at AWS IAM Step 4A for setting up GitHub Actions OIDC for RURIGIMK/clinic-booking-platform. My identity provider status is: exists. Guide me from this exact point using the current AWS console."
 
-Rather than changing the settings immediately, I compared the explanation with the repository and workflow. The configuration already specified the `main` branch, the `frontend` directory, the Wrangler deployment command, and the API URL. The available evidence did not justify treating those settings as the primary cause without further investigation.
+This prompt reflects my use of AI to work through the AWS IAM and GitHub Actions OIDC configuration step by step. I used the guidance to navigate the setup while checking the instructions against the AWS console and the repository's actual configuration.
 
-I challenged the explanation and redirected the investigation towards the actual configuration and workflow evidence. This avoided making unnecessary changes based on a diagnosis that was not sufficiently supported.
+## 4.3 One time AI was wrong or incomplete
 
-The experience reinforced that generative AI can produce plausible and confident explanations from incomplete context. I found it more useful to treat generated output as a hypothesis, inspect the relevant evidence, and change the implementation only when the evidence justified doing so.
+One example arose during Cloudflare deployment troubleshooting. AI suggested possible configuration changes as explanations for the deployment problem, but the initial suggestions did not establish the actual cause. I needed to examine the repository and deployment workflow instead of assuming that a plausible explanation was correct.
 
-## 4.4 Name two decisions you made without AI. Why did you trust your own judgment there?
+The investigation included checking the deployment command and configuration. The Wrangler entry point needed to be specified explicitly for `wrangler.jsonc`, while a separate issue involving Cloudflare credentials required attention to the production environment's secrets.
 
-### Decision 1: Not changing hosting settings without evidence
+This experience demonstrated that AI can generate technically plausible explanations based on common deployment patterns without fully accounting for the configuration of a particular project. Applying a suggested change without verifying its cause could introduce unrelated changes or make the original problem harder to identify.
 
-I chose not to change the existing Cloudflare settings simply because a troubleshooting explanation suggested they were wrong. I checked the configuration and workflow first.
+I therefore treated AI suggestions as hypotheses and used repository configuration and deployment evidence to guide troubleshooting. The main lesson was that the usefulness of a suggestion depends on whether it matches the actual environment, not simply on whether it sounds technically correct.
 
-I trusted this decision because the repository and deployment configuration provided direct evidence of the current setup. The proposed diagnosis was only a hypothesis. Changing settings without identifying a concrete fault could introduce unnecessary risk and make the original issue harder to isolate.
+## 4.4 Two decisions I made without AI
 
-### Decision 2: Separating deployment success from end-to-end verification
+**Decision 1: Avoiding unsupported configuration changes**
 
-I chose to document the successful deployment as evidence that the deployment workflow completed, rather than claiming that every booking operation had been verified in production.
+I chose not to change existing hosting settings simply because AI suggested that they might be responsible for a deployment problem. I wanted changes to address an identifiable cause rather than introduce unrelated modifications. I trusted this decision because the repository configuration and workflow provided more relevant evidence than a general recommendation.
 
-A deployment log cannot establish that a patient can retrieve doctor availability, book an appointment, cancel it, or reschedule it successfully. Those behaviours require separate tests against the deployed API and database.
+**Decision 2: Separating deployment success from functional verification**
 
-I trusted this distinction because it follows from what each check actually measures. It also keeps the README technically accurate by separating a successful deployment from functional verification that remains outstanding.
+I chose to distinguish successful deployment and health checks from verification of the complete appointment-booking workflow. A service responding successfully to a health request does not necessarily prove that the database schema is correct or that booking, cancellation, rescheduling, and concurrent requests all behave as expected.
 
-## 4.5 Reflection
+I retained this distinction in the documentation so that the project's status would reflect the checks actually performed. I considered it important not to describe the application as fully verified when some database and functional checks remained outstanding.
 
-My approach was to use AI to accelerate investigation, generate drafts and candidate solutions, and improve the clarity of technical documentation while retaining responsibility for engineering decisions.
+These decisions demonstrate that I was not treating AI output or deployment status as a substitute for engineering judgment. I used the available evidence to decide what could reasonably be claimed about the system.
 
-The most useful results came from combining generative assistance with direct inspection of the repository, test output, configuration files, and deployment logs. AI helped me explore options and communicate decisions more efficiently, but it did not remove the need to understand the system or verify the result.
+## 4.5 What I would do differently
 
-I remained responsible for deciding which suggestions to use, adapting generated code and documentation to the project, and ensuring that claims in the submission matched the available evidence. I consider that balance important when using AI in day-to-day engineering work.
+I would define the verification steps earlier and separate deployment checks from functional and database checks. Health endpoints are useful for confirming that a service responds, but they do not replace testing the complete booking lifecycle or checking the production database schema.
+
+The deployment and basic health and connectivity checks provided useful evidence that the service was responding. However, I have not yet verified the complete booking lifecycle against production PostgreSQL, and I would not claim that this testing has been completed.
+
+In future projects, I would establish the acceptance criteria and verification commands before deployment, keep a clearer record of the actual prompts and configuration changes, and test assumptions behind AI-generated suggestions earlier. I would also document the difference between implemented features, successfully executed tests, and checks that remain outstanding.
+
+This experience reinforced my understanding that AI is most useful as a development assistant when its suggestions are evaluated critically. It can accelerate implementation and troubleshooting, but the developer remains responsible for validating the results, understanding the system, and making accurate claims about what has been achieved.
 
 ---
 
