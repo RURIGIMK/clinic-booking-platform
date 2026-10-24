@@ -44,11 +44,11 @@ The GitHub Actions role is:
 - Role name: `ClinicBookingGitHubActionsDeploy`
 - ARN: `arn:aws:iam::284443068612:role/ClinicBookingGitHubActionsDeploy`
 
-The OIDC provider should be `token.actions.githubusercontent.com`, with audience `sts.amazonaws.com`. Restrict the trust policy to this exact repository and the GitHub Actions `production` environment. The subject condition should be:
+The OIDC provider should be `token.actions.githubusercontent.com`, with audience `sts.amazonaws.com`. Restrict the trust policy to this exact repository and the GitHub Actions `production` environment. The repository uses immutable owner and repository identifiers in its OIDC subject. The expected subject condition is:
 
-`repo:RURIGIMK/clinic-booking-platform:environment:production`
+`repo:RURIGIMK@122110352/clinic-booking-platform@1429661826:environment:production`
 
-Because the deployment job uses the `production` environment, the environment subject is the one to allow.
+Do not use the older human-readable subject `repo:RURIGIMK/clinic-booking-platform:environment:production`; it does not match the immutable subject configured for this repository. Because the deployment job uses the `production` environment, the environment subject is the one to allow.
 
 Attach a permissions policy limited to the one Lambda function. Required actions for this workflow are:
 
@@ -73,19 +73,66 @@ The existing Cloudflare environment entries must remain in place:
 
 Do not store AWS access key IDs or secret access keys; the workflow uses OIDC. Use a Cloudflare token scoped to the required Worker deployment permissions only.
 
-## Step 4: Check the application database is already initialized
+## Step 4: Verify the PostgreSQL schema before deployment
 
-The current application has schema creation and compatibility code in a FastAPI startup hook, while the Lambda adapter is configured with `lifespan="off"`. Do not assume that startup hook runs in Lambda. Before deployment, confirm that the production database already has all current tables and columns, including `break_starts_at` and `break_ends_at` in `doctor_working_hours`.
+The application defines its schema in SQLAlchemy models and includes `Base.metadata.create_all()` plus a compatibility helper in a FastAPI startup hook. The Lambda adapter is configured with `lifespan="off"`, so do not assume that startup hook runs in Lambda. The deployment workflow does not run `create_all()`, alter tables, or apply migrations.
 
-The deployment job does not run `create_all()` or modify the production database. If schema changes are needed, make and test an explicit migration separately, with a backup/recovery plan. A code deployment should not silently become a production database migration.
+Use a read-only database session against the same PostgreSQL database used by the production API. Do not paste credentials into logs, commits, or chat. Confirm that these tables exist:
 
-## Step 5: Open a pull request and review the run
+- `doctors`
+- `doctor_working_hours`
+- `patients`
+- `appointments`
 
-Open a pull request from `feature/backend-auto-deployment` into `main`. The backend checks and frontend build should run, but no deployment jobs should run on the feature branch or pull request.
+Confirm that `doctor_working_hours` includes `break_starts_at` and `break_ends_at`, and that `appointments` includes the columns defined in `backend/app/models.py`: `doctor_id`, `patient_id`, `starts_at`, `ends_at`, `status`, `cancellation_reason`, and `created_at`.
 
-Review the changed workflow, requirements file, and this guide. Merge only after checks pass and the AWS role permissions, trust policy, API base URL, health endpoints, and database schema readiness have been verified.
+Run these read-only checks in a PostgreSQL SQL client:
 
-## Step 6: Verify a real deployment
+```sql
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN (
+    'doctors', 'doctor_working_hours', 'patients', 'appointments'
+  )
+ORDER BY table_name;
+
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'doctor_working_hours'
+ORDER BY ordinal_position;
+
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename = 'appointments'
+ORDER BY indexname;
+```
+
+Expected concurrency safeguard: the appointments table should have the partial unique index `uq_active_doctor_slot` on `(doctor_id, starts_at)` for rows where `status = 'booked'`. This lets PostgreSQL reject two active bookings for the same doctor's exact slot even when requests race. The application maps an `IntegrityError` from booking or rescheduling to HTTP 409. The index does not replace application validation for clinic hours, breaks, slot alignment, or overlapping intervals.
+
+If a required table, column, or index is missing, stop and plan a reviewed migration with a backup and recovery procedure. Do not treat a successful `/ready` response as proof that the full application schema is correct: `/ready` currently checks database connectivity with `SELECT 1` only.
+
+## Step 5: Verify booking concurrency safely
+
+The current automated booking tests check sequential duplicate booking and slot release, but they do not prove that simultaneous PostgreSQL requests cannot both book the same slot. Verify this separately against a staging database that matches the production schema, using synthetic doctor and patient records only.
+
+1. Choose a future, valid 30-minute slot for a synthetic doctor.
+2. Submit two booking requests at the same time for the same doctor and `starts_at`, using separate database sessions.
+3. Confirm that exactly one request succeeds and the other receives HTTP 409. Inspect the database to confirm there is only one active booking for that doctor and start time.
+4. Repeat for rescheduling into a slot another active appointment already occupies.
+5. Confirm that cancelling the winning booking releases the slot and that a new booking can then succeed.
+
+Do not run a race test against real patient records or an actively used production slot. If staging verification cannot be performed, record concurrency as unverified rather than assuming the database constraint is present or effective.
+
+## Step 6: Open a pull request and review the run
+
+Open a pull request from a feature branch into `main`. The backend checks and frontend build should run, but deployment jobs should not run on the feature branch or pull request.
+
+Review the changed workflow, Lambda requirements file, and this guide. Merge only after CI passes and the AWS role permissions, immutable OIDC trust subject, API base URL, health endpoints, PostgreSQL schema, and concurrency safeguard have been verified.
+
+## Step 7: Verify a real deployment
 
 After merging to `main`:
 
