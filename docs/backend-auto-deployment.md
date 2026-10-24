@@ -12,69 +12,72 @@ This repository deploys the backend to the existing AWS Lambda function and then
 
 The workflow deliberately does not create or alter database tables. Database schema changes need a separate, reviewed migration plan.
 
-## Step 1: Verify the existing Lambda before enabling deployment
+## Step 1: Verify the existing Lambda
 
-In AWS Console, open **Lambda**, select the function currently connected to the API Gateway endpoint, and record:
+The existing Lambda is:
 
-- Function name
-- Runtime, expected to be Python 3.12
-- Architecture, expected to be x86_64 for this workflow
-- Handler, expected to be `app.lambda_handler.handler`
-- Execution role and attached database/network configuration
+- Function name: `clinic-booking-api`
+- ARN: `arn:aws:lambda:eu-west-2:284443068612:function:clinic-booking-api`
+- Region: `eu-west-2`
+- Runtime: Python 3.12
+- Architecture: x86_64
+- Expected handler: `app.lambda_handler.handler`
 
-Do not change the function runtime, architecture, handler, environment variables, VPC/network settings, or database configuration as part of this setup. If the runtime or architecture differs, update the workflow packaging target deliberately before enabling deployment.
+Do not change the function runtime, architecture, handler, environment variables, VPC/network settings, or database configuration as part of this setup without reviewing the impact.
 
 The API Gateway base URL currently configured in CI is:
 
 `https://yfk5o3gvki.execute-api.eu-west-2.amazonaws.com`
 
-Confirm that it is the correct deployed API base URL and that both `/health` and `/ready` work before turning on automated deployments.
+Confirm that it is the correct deployed API base URL and that both `/health` and `/ready` work before enabling an automated production deployment. If API Gateway uses a named stage in its invoke URL, the stage path must be included consistently in the workflow's smoke tests and frontend build configuration.
 
-## Step 2: Create a narrowly scoped AWS IAM deployment role
+## Step 2: Configure the AWS IAM deployment role
 
-Create an IAM role for GitHub Actions with a web identity / OIDC trust relationship.
+The GitHub Actions role is:
+
+- Role name: `ClinicBookingGitHubActionsDeploy`
+- ARN: `arn:aws:iam::284443068612:role/ClinicBookingGitHubActionsDeploy`
 
 The OIDC provider should be `token.actions.githubusercontent.com`, with audience `sts.amazonaws.com`. Restrict the trust policy to this exact repository and the GitHub Actions `production` environment. The subject condition should be:
 
 `repo:RURIGIMK/clinic-booking-platform:environment:production`
 
-Do not use a wildcard repository or branch subject. Since the workflow job uses the `production` environment, the environment subject is the one to allow.
+Because the deployment job uses the `production` environment, the environment subject is the one to allow.
 
 Attach a permissions policy limited to the one Lambda function. Required actions for this workflow are:
 
 - `lambda:GetFunctionConfiguration`
 - `lambda:UpdateFunctionCode`
 
-Scope the resource to the exact Lambda function ARN in `eu-west-2`. The role does not need `iam:PassRole`, permission to create functions, or broad administrator access for a code-only update.
+Scope the resource to the exact Lambda ARN above. The role does not need `iam:PassRole`, permission to create functions, or broad administrator access for a code-only update.
 
-Record the role ARN. Never paste credentials or secrets into the repository or chat.
+## Step 3: Verify the existing GitHub production environment
 
-## Step 3: Configure the GitHub production environment
+The repository already has a `production` environment. Keep the existing environment and its Cloudflare configuration; do not recreate it or remove existing values.
 
-In GitHub, open **Settings → Environments → New environment** and create `production`.
+Verify that these AWS entries are present:
 
-Add the following environment-scoped values:
+- **Environment secret** `AWS_DEPLOY_ROLE_ARN`: `arn:aws:iam::284443068612:role/ClinicBookingGitHubActionsDeploy`
+- **Environment variable** `AWS_LAMBDA_FUNCTION_NAME`: `clinic-booking-api`
 
-- **Variable** `AWS_LAMBDA_FUNCTION_NAME`: exact existing Lambda function name
-- **Secret** `AWS_DEPLOY_ROLE_ARN`: IAM role ARN created in Step 2
-- **Secret** `CLOUDFLARE_API_TOKEN`: existing Cloudflare token used by the current frontend deployment
-- **Secret** `CLOUDFLARE_ACCOUNT_ID`: existing Cloudflare account ID
+The existing Cloudflare environment entries must remain in place:
 
-Keep the Cloudflare values in place. Use a Cloudflare token scoped to the required Worker deployment permissions only. Do not store AWS access key IDs or secret access keys; the workflow uses OIDC.
+- **Secret** `CLOUDFLARE_API_TOKEN`
+- **Secret** `CLOUDFLARE_ACCOUNT_ID`
 
-If your repository already has the Cloudflare secrets at repository level, they can remain there. Environment-scoped values take precedence for jobs that use the `production` environment.
+Do not store AWS access key IDs or secret access keys; the workflow uses OIDC. Use a Cloudflare token scoped to the required Worker deployment permissions only.
 
 ## Step 4: Check the application database is already initialized
 
 The current application has schema creation and compatibility code in a FastAPI startup hook, while the Lambda adapter is configured with `lifespan="off"`. Do not assume that startup hook runs in Lambda. Before deployment, confirm that the production database already has all current tables and columns, including `break_starts_at` and `break_ends_at` in `doctor_working_hours`.
 
-The new deployment job does not run `create_all()` or modify the production database. If schema changes are needed, make and test an explicit migration separately, with a backup/recovery plan. A code deployment should not silently become a production database migration.
+The deployment job does not run `create_all()` or modify the production database. If schema changes are needed, make and test an explicit migration separately, with a backup/recovery plan. A code deployment should not silently become a production database migration.
 
 ## Step 5: Open a pull request and review the run
 
-Push this branch and open a pull request into `main`. The backend checks and frontend build should run, but no deployment jobs should run on the feature branch or pull request.
+Open a pull request from `feature/backend-auto-deployment` into `main`. The backend checks and frontend build should run, but no deployment jobs should run on the feature branch or pull request.
 
-Review the changed workflow, requirements file, and this guide. Merge only after the checks pass and the AWS values and role trust policy have been verified.
+Review the changed workflow, requirements file, and this guide. Merge only after checks pass and the AWS role permissions, trust policy, API base URL, health endpoints, and database schema readiness have been verified.
 
 ## Step 6: Verify a real deployment
 
